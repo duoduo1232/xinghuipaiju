@@ -2339,6 +2339,12 @@ function App() {
 
   const canNetPlay = !isNetwork || p2pStarted;
   const blocksForPendingChoice = Boolean(pendingFallOwnerId) && (!isNetwork || pendingFallOwnerId === localSeat);
+  const canControlCurrentPhase = !victor
+    && canNetPlay
+    && !blocksForPendingChoice
+    && !isAiTurn
+    && (!isNetwork || currentPlayer === localSeat);
+  const canUsePhaseButton = canControlCurrentPhase && isActivePerspective;
   const canPlay = currentStep === 'play' && isActivePerspective && isLocalTurn && canNetPlay && !isAiTurn && !blocksForPendingChoice;
   const canAction = currentStep === 'action' && isActivePerspective && isLocalTurn && canNetPlay && !isAiTurn && !blocksForPendingChoice;
   const canCycle = isActivePerspective && isLocalTurn && canNetPlay && !isAiTurn && !blocksForPendingChoice && visiblePlayer.skill >= 1 && visiblePlayer.hand.length > 0;
@@ -2798,6 +2804,7 @@ function App() {
   }, [selectedHandCardId, visiblePlayer.hand, canPlay, victor, game, selectedPlayer]);
 
   function advance() {
+    if (!canUsePhaseButton) return;
     if (targetRequest) return;
     if (canAction && actionActor) {
       setTargetRequest({ type: 'action', actor: actionActor, playerId: selectedPlayer });
@@ -3021,12 +3028,12 @@ function App() {
               {phaseLabel(game)}
               {canAction && actionActor ? ` · ${actionActor.name}` : ''}
             </div>
-            <button className="primary-action" onClick={advance} disabled={Boolean(victor)}>
+            <button className="primary-action turn-action" onClick={advance} disabled={!canUsePhaseButton}>
               <Play size={17} />
-              {canAction ? (actionActor ? '选择目标' : '结束行动') : '进入下一阶段'}
+              {isAiTurn ? 'AI行动中' : !isActivePerspective ? '切到当前玩家' : canAction ? (actionActor ? '选择目标' : '结束行动') : '进入下一阶段'}
             </button>
             {canAction && actionActor ? (
-              <button className="mini-action" onClick={skipCurrentAction} disabled={Boolean(victor)}>
+              <button className="mini-action turn-skip-action" onClick={skipCurrentAction} disabled={!canUsePhaseButton}>
                 <ChevronRight size={15} />
                 跳过行动
               </button>
