@@ -769,6 +769,7 @@ button:not(:disabled) {
 
 .battlefield {
   position: relative;
+  z-index: 2;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) 176px minmax(320px, 1fr);
@@ -1249,7 +1250,7 @@ button:not(:disabled) {
 
 .hand-tray {
   position: relative;
-  z-index: 30;
+  z-index: 40;
   display: block;
   overflow: visible;
   padding: 10px 24px 14px;
@@ -1310,19 +1311,19 @@ button:not(:disabled) {
 }
 
 .hand-card-wrap.selected {
-  z-index: 999;
-  transform: translateY(-26px) scale(calc(var(--hand-card-scale, 1) * 1.14));
+  z-index: 2000;
+  transform: translateY(-26px) scale(calc(var(--hand-card-scale, 1) * 1.16));
 }
 
 .hand-card-wrap.selected .card-mini {
   position: relative;
-  z-index: 10000;
+  z-index: 3000;
   filter: saturate(1.08) brightness(1.04);
   box-shadow: 0 0 0 3px rgba(87, 157, 220, 0.72), 0 14px 24px rgba(42, 66, 103, 0.28);
 }
 
 .hand-card-wrap.selected .inspect-card {
-  z-index: 10002;
+  z-index: 3001;
   transform: scale(1.05);
 }
 
@@ -2008,7 +2009,7 @@ button:not(:disabled) {
 .coin-overlay {
   position: fixed;
   inset: 0;
-  z-index: 20000;
+  z-index: 50000;
   display: grid;
   place-items: center;
   padding: 18px;
@@ -2031,7 +2032,7 @@ button:not(:disabled) {
 }
 
 .p2p-overlay {
-  z-index: 20010;
+  z-index: 50010;
   background: rgba(64, 83, 112, 0.2);
   backdrop-filter: blur(2px);
 }
@@ -3697,7 +3698,7 @@ button:not(:disabled) {
   }
 
   .hand-card-wrap.selected {
-    transform: translateY(-18px) scale(1.12);
+    transform: translateY(-18px) scale(calc(var(--hand-card-scale, 1) * 1.16));
   }
 
   .card-mini {

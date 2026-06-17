@@ -359,10 +359,11 @@ function normalizeUpdateProxy(proxy = '') {
 function normalizeLanUrl(input = '') {
   const trimmed = String(input).trim();
   if (!trimmed) {
-    throw new Error('请填写局域网地址，例如 ws://192.168.1.5:8781');
+    throw new Error('请填写联机服务器地址，例如 192.168.1.5:8781 或 example.com:8781');
   }
 
   let candidate = trimmed;
+  const hasProtocol = /^(?:https?|wss?):\/\//i.test(candidate);
   if (/^https?:\/\//i.test(candidate)) {
     candidate = candidate.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
   } else if (!/^wss?:\/\//i.test(candidate)) {
@@ -370,13 +371,8 @@ function normalizeLanUrl(input = '') {
   }
 
   const url = new URL(candidate);
-  if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
-    throw new Error('局域网地址格式不对，例如 ws://192.168.1.5:8781');
-  }
-  if (!url.hostname) {
-    throw new Error('局域网地址格式不对，例如 ws://192.168.1.5:8781');
-  }
-  if (!url.port) {
+  if (url.protocol !== 'ws:' && url.protocol !== 'wss:') url.protocol = 'ws:';
+  if (!hasProtocol && !url.port) {
     url.port = '8781';
   }
   return url;
@@ -2610,7 +2606,7 @@ function App() {
         socket.send(JSON.stringify({ type: 'name', seat: localSeat, name: playerName }));
       };
       socket.onclose = () => setNetStatus('局域网已断开');
-      socket.onerror = () => setNetError('局域网连接失败，检查地址和同一 Wi-Fi。');
+      socket.onerror = () => setNetError('连接失败，请检查服务器地址、端口、防火墙或公网转发。');
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
@@ -2647,7 +2643,7 @@ function App() {
         }
       };
     } catch (error) {
-      setNetError(error instanceof Error ? error.message : '局域网地址格式不对，例如 ws://192.168.1.5:8781');
+      setNetError(error instanceof Error ? error.message : '联机地址无法识别，例如 192.168.1.5:8781 或 example.com:8781');
     }
   }
 
@@ -3730,8 +3726,8 @@ function P2PPanel({
               <input value={lanRoom} onChange={(event) => onLanRoomChange(event.target.value)} placeholder="room1" />
             </label>
             <button className="primary-action" onClick={onConnectLan}>连接局域网房间</button>
-            <p>在电脑的项目目录运行 npm run lan，默认端口 8781。自定义端口运行 npm run lan -- --port 9000。</p>
-            <p>同一 Wi-Fi 填 ws://电脑IP:8781；公网/内网穿透填 ws://公网地址:端口。两台手机房间号要一致。</p>
+            <p>运行 npm run lan 可启动联机服务器，默认端口 8781。自定义端口运行 npm run lan -- --port 9000。</p>
+            <p>可填局域网 IP、服务器域名、公网 IP 或内网穿透地址，例如 192.168.1.5:8781、example.com:8781、wss://example.com/ws。两台设备房间号要一致。</p>
           </section>
         ) : (
           <div className="p2p-grid">
