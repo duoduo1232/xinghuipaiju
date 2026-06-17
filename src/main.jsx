@@ -204,6 +204,11 @@ const DEFAULT_SETTINGS = {
   musicUrl: '',
   uiScale: 100,
   fontScale: 100,
+  handCardScale: 112,
+  boardCardScale: 110,
+  startScale: 100,
+  gameOffsetX: 0,
+  gameOffsetY: 0,
   updateRepo: DEFAULT_UPDATE_REPO,
   updateProxy: DEFAULT_UPDATE_PROXY,
   developerCards: [],
@@ -301,6 +306,11 @@ function getStoredSettings() {
       ...parsed,
       uiScale: Math.min(300, Math.max(1, Number(parsed.uiScale) || DEFAULT_SETTINGS.uiScale)),
       fontScale: Math.min(200, Math.max(50, Number(parsed.fontScale) || DEFAULT_SETTINGS.fontScale)),
+      handCardScale: Math.min(180, Math.max(70, Number(parsed.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
+      boardCardScale: Math.min(180, Math.max(70, Number(parsed.boardCardScale) || DEFAULT_SETTINGS.boardCardScale)),
+      startScale: Math.min(160, Math.max(60, Number(parsed.startScale) || DEFAULT_SETTINGS.startScale)),
+      gameOffsetX: Math.min(300, Math.max(-300, Number(parsed.gameOffsetX) || DEFAULT_SETTINGS.gameOffsetX)),
+      gameOffsetY: Math.min(300, Math.max(-300, Number(parsed.gameOffsetY) || DEFAULT_SETTINGS.gameOffsetY)),
       updateRepo: typeof parsed.updateRepo === 'string' ? parsed.updateRepo.trim() : DEFAULT_SETTINGS.updateRepo,
       updateProxy: typeof parsed.updateProxy === 'string' ? normalizeUpdateProxy(parsed.updateProxy) : DEFAULT_SETTINGS.updateProxy,
       developerCards: Array.isArray(parsed.developerCards) ? parsed.developerCards : [],
@@ -2949,6 +2959,10 @@ function App() {
       style={{
         '--ui-scale': settings.uiScale / 100,
         '--font-scale': (settings.fontScale ?? 100) / 100,
+        '--hand-card-scale': (settings.handCardScale ?? DEFAULT_SETTINGS.handCardScale) / 100,
+        '--board-card-scale': (settings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale) / 100,
+        '--game-offset-x': `${settings.gameOffsetX ?? 0}px`,
+        '--game-offset-y': `${settings.gameOffsetY ?? 0}px`,
         fontSize: `${settings.fontScale ?? 100}%`,
       }}
     >
@@ -3201,6 +3215,11 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       ...draftSettings,
       uiScale: Math.min(300, Math.max(1, Number(draftSettings.uiScale) || 100)),
       fontScale: Math.min(200, Math.max(50, Number(draftSettings.fontScale) || 100)),
+      handCardScale: Math.min(180, Math.max(70, Number(draftSettings.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
+      boardCardScale: Math.min(180, Math.max(70, Number(draftSettings.boardCardScale) || DEFAULT_SETTINGS.boardCardScale)),
+      startScale: Math.min(160, Math.max(60, Number(draftSettings.startScale) || DEFAULT_SETTINGS.startScale)),
+      gameOffsetX: Math.min(300, Math.max(-300, Number(draftSettings.gameOffsetX) || DEFAULT_SETTINGS.gameOffsetX)),
+      gameOffsetY: Math.min(300, Math.max(-300, Number(draftSettings.gameOffsetY) || DEFAULT_SETTINGS.gameOffsetY)),
       updateRepo: normalizeGitHubRepo(draftSettings.updateRepo),
       updateProxy: normalizeUpdateProxy(draftSettings.updateProxy),
     });
@@ -3285,6 +3304,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       style={{
         '--ui-scale': (settings.uiScale ?? 100) / 100,
         '--font-scale': (settings.fontScale ?? 100) / 100,
+        '--start-scale': (settings.startScale ?? DEFAULT_SETTINGS.startScale) / 100,
         fontSize: `${settings.fontScale ?? 100}%`,
       }}
     >
@@ -3380,6 +3400,54 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
             <button type="button" className="mini-action" onClick={() => setDeveloperOpen((open) => !open)}>
               {developerOpen ? '关闭开发者模式' : '开发者模式'}
             </button>
+            <details className="advanced-ui-settings">
+              <summary>高级界面设置</summary>
+              <label htmlFor="hand-card-scale">手牌卡牌大小 70-180%</label>
+              <input
+                id="hand-card-scale"
+                type="number"
+                min="70"
+                max="180"
+                value={draftSettings.handCardScale ?? DEFAULT_SETTINGS.handCardScale}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, handCardScale: event.target.value }))}
+              />
+              <label htmlFor="board-card-scale">场上卡牌大小 70-180%</label>
+              <input
+                id="board-card-scale"
+                type="number"
+                min="70"
+                max="180"
+                value={draftSettings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, boardCardScale: event.target.value }))}
+              />
+              <label htmlFor="start-scale">主界面大小 60-160%</label>
+              <input
+                id="start-scale"
+                type="number"
+                min="60"
+                max="160"
+                value={draftSettings.startScale ?? DEFAULT_SETTINGS.startScale}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, startScale: event.target.value }))}
+              />
+              <label htmlFor="game-offset-x">游戏界面左右移动 -300 到 300</label>
+              <input
+                id="game-offset-x"
+                type="number"
+                min="-300"
+                max="300"
+                value={draftSettings.gameOffsetX ?? DEFAULT_SETTINGS.gameOffsetX}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, gameOffsetX: event.target.value }))}
+              />
+              <label htmlFor="game-offset-y">游戏界面上下移动 -300 到 300</label>
+              <input
+                id="game-offset-y"
+                type="number"
+                min="-300"
+                max="300"
+                value={draftSettings.gameOffsetY ?? DEFAULT_SETTINGS.gameOffsetY}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, gameOffsetY: event.target.value }))}
+              />
+            </details>
             {developerOpen && (
               <section className="developer-panel">
                 <h2>卡牌与代码</h2>

@@ -51,6 +51,7 @@ button:not(:disabled) {
   position: relative;
   width: min(1500px, calc(100vw - 20px));
   height: min(860px, calc(100vh - 20px));
+  transform: translate(var(--game-offset-x, 0px), var(--game-offset-y, 0px));
   display: grid;
   grid-template-rows: 50px 32px minmax(400px, 1fr) 204px;
   overflow: hidden;
@@ -90,6 +91,8 @@ button:not(:disabled) {
   position: relative;
   width: min(760px, calc(100vw - 28px));
   min-height: min(520px, calc(100vh - 28px));
+  transform: scale(var(--start-scale, 1));
+  transform-origin: center;
   display: grid;
   align-content: center;
   gap: 34px;
@@ -179,6 +182,7 @@ button:not(:disabled) {
 .full-settings-panel > button,
 .full-settings-panel > label,
 .full-settings-panel > input,
+.full-settings-panel > details,
 .full-settings-panel > section {
   order: 1;
 }
@@ -193,6 +197,25 @@ button:not(:disabled) {
 .settings-row input[type="checkbox"] {
   width: 22px;
   min-height: 22px;
+}
+
+.advanced-ui-settings {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  color: #30425d;
+  border: 2px solid rgba(108, 136, 176, 0.34);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.advanced-ui-settings summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.advanced-ui-settings[open] summary {
+  margin-bottom: 2px;
 }
 
 .update-panel {
@@ -1028,15 +1051,15 @@ button:not(:disabled) {
 
 .unit-card,
 .empty-slot {
-  flex: 1 1 136px;
+  flex: 1 1 calc(136px * var(--board-card-scale, 1));
   min-width: 0;
-  max-width: 190px;
+  max-width: calc(190px * var(--board-card-scale, 1));
 }
 
 .unit-card {
-  min-height: 202px;
+  min-height: calc(202px * var(--board-card-scale, 1));
   display: grid;
-  grid-template-rows: 82px auto auto auto;
+  grid-template-rows: calc(82px * var(--board-card-scale, 1)) auto auto auto;
   gap: 7px;
   padding: 10px;
   color: #30425d;
@@ -1056,7 +1079,7 @@ button:not(:disabled) {
 
 .unit-back {
   width: 100%;
-  height: 82px;
+  height: calc(82px * var(--board-card-scale, 1));
   object-fit: cover;
   image-rendering: pixelated;
   border-radius: 12px;
@@ -1064,7 +1087,7 @@ button:not(:disabled) {
 }
 
 .empty-slot {
-  min-height: 202px;
+  min-height: calc(202px * var(--board-card-scale, 1));
   border: 2px dashed rgba(108, 136, 176, 0.32);
   border-radius: 18px;
   background:
@@ -1240,7 +1263,7 @@ button:not(:disabled) {
 
 .hand-card-wrap {
   position: relative;
-  flex: 0 0 136px;
+  flex: 0 0 calc(136px * var(--hand-card-scale, 1));
   display: grid;
   justify-items: center;
   margin-left: -12px;
@@ -1279,18 +1302,32 @@ button:not(:disabled) {
 
 .inspect-card {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: calc(8px * var(--hand-card-scale, 1));
+  right: calc(8px * var(--hand-card-scale, 1));
   z-index: 8;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(28px * var(--hand-card-scale, 1));
+  height: calc(28px * var(--hand-card-scale, 1));
+  min-width: calc(28px * var(--hand-card-scale, 1));
+  min-height: calc(28px * var(--hand-card-scale, 1));
+  padding: 0;
+  line-height: 1;
+  font-size: 0;
+}
+
+.inspect-card svg {
+  display: block;
+  width: calc(15px * var(--hand-card-scale, 1));
+  height: calc(15px * var(--hand-card-scale, 1));
+  margin: 0;
+  flex: 0 0 auto;
 }
 
 .card-mini {
-  width: 136px;
-  height: 181px;
+  width: calc(136px * var(--hand-card-scale, 1));
+  height: calc(181px * var(--hand-card-scale, 1));
   position: relative;
   overflow: hidden;
   padding: 0;
