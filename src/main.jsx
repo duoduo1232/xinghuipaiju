@@ -6,6 +6,7 @@ import cardFrameUrl from '../1.png';
 import cardBackUrl from './assets/card-back.png';
 import skillIconUrl from './assets/skill-icon.png';
 import spiritIconUrl from './assets/spirit-icon.png';
+import { APP_CONFIG } from './appConfig.js';
 import { CARD_ART_FILENAMES } from './cardArtMap.js';
 import { STARTING_DECK } from './cardData.js';
 import './styles.css';
@@ -42,8 +43,8 @@ const MIN_MAX_SPIRIT = 20;
 const SELF_DESTRUCT_BURSTS = 3;
 const AI_PASS_SCORE_FLOOR = -80;
 const APP_VERSION = packageInfo.version ?? '0.0.0';
-const DEFAULT_UPDATE_REPO = '';
-const DEFAULT_UPDATE_PROXY = 'https://ghproxy.cxkpro.top';
+const DEFAULT_UPDATE_REPO = APP_CONFIG.updateRepo;
+const DEFAULT_UPDATE_PROXY = APP_CONFIG.updateProxy;
 
 function getCardArtUrl(card) {
   if (card.artDataUrl) return card.artDataUrl;

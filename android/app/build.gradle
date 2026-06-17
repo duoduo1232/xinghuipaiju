@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+import groovy.json.JsonSlurper
+
+def packageJson = new JsonSlurper().parse(file("../../package.json"))
+def appVersionName = packageJson.version as String
+def versionParts = appVersionName.tokenize('.').collect { part ->
+    (part.replaceAll(/[^0-9].*$/, '') ?: '0') as int
+}
+while (versionParts.size() < 3) {
+    versionParts << 0
+}
+def appVersionCode = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+
 android {
     namespace = "com.pixelcard.duel"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +19,8 @@ android {
         applicationId "com.pixelcard.duel"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +28,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        xinghuiDev {
+            storeFile file("xinghui-dev.keystore")
+            storePassword "xinghui123"
+            keyAlias "xinghui-dev"
+            keyPassword "xinghui123"
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.xinghuiDev
+        }
         release {
+            signingConfig signingConfigs.xinghuiDev
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
