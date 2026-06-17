@@ -27,7 +27,6 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  overflow: hidden;
   overscroll-behavior: none;
 }
 
@@ -47,6 +46,11 @@ button:not(:disabled) {
   background:
     linear-gradient(rgba(244, 237, 220, 0.4), rgba(244, 237, 220, 0.58)),
     url("./assets/bj.png") center / cover no-repeat;
+}
+
+.game-shell {
+  height: 100vh;
+  overflow: hidden;
 }
 
 .game-table {
@@ -1279,7 +1283,7 @@ button:not(:disabled) {
 
 .hand-scroll {
   position: relative;
-  z-index: 10001;
+  z-index: 14000;
   width: 100%;
   display: flex;
   align-items: flex-end;
@@ -1296,7 +1300,7 @@ button:not(:disabled) {
 
 .hand-card-wrap {
   position: relative;
-  z-index: 10002;
+  z-index: 14001;
   flex: 0 0 calc(136px * var(--hand-card-scale, 1));
   display: grid;
   justify-items: center;
@@ -1311,25 +1315,34 @@ button:not(:disabled) {
 }
 
 .hand-card-wrap:hover {
-  z-index: 12000;
+  z-index: 14002;
   transform: translateY(-16px) scale(calc(var(--hand-card-scale, 1) * 1.08));
 }
 
 .hand-card-wrap.selected {
-  z-index: 14000;
+  z-index: 14003;
   transform: translateY(-26px) scale(calc(var(--hand-card-scale, 1) * 1.16));
 }
 
 .hand-card-wrap.selected .card-mini {
   position: relative;
-  z-index: 14001;
+  z-index: 14004;
   filter: saturate(1.08) brightness(1.04);
   box-shadow: 0 0 0 3px rgba(87, 157, 220, 0.72), 0 14px 24px rgba(42, 66, 103, 0.28);
 }
 
 .hand-card-wrap.selected .inspect-card {
-  z-index: 14002;
+  z-index: 14005;
   transform: scale(1.05);
+}
+
+.hand-card-wrap .card-mini {
+  position: relative;
+  z-index: 14004;
+}
+
+.hand-card-wrap .inspect-card {
+  z-index: 14005;
 }
 
 .hand-card-wrap.disabled .card-mini {

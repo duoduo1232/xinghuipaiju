@@ -2984,7 +2984,7 @@ function App() {
 
   return (
     <main
-      className="app-shell"
+      className="app-shell game-shell"
       style={{
         '--ui-scale': settings.uiScale / 100,
         '--font-scale': (settings.fontScale ?? 100) / 100,
