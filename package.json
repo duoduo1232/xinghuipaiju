@@ -1,0 +1,30 @@
+{
+  "name": "pixel-card-duel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "screenshot": "node scripts/screenshot-ui.mjs",
+    "gen:image": "node scripts/generate-sensenova-image.mjs",
+    "audit:cards": "node scripts/audit-objective-cards.mjs",
+    "audit:behavior": "node scripts/audit-objective-behavior.mjs",
+    "lan": "node scripts/lan-server.mjs",
+    "lan:8781": "node scripts/lan-server.mjs --port 8781",
+    "lan:port": "node scripts/lan-server.mjs --port"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.5.0",
+    "vite": "^7.0.0",
+    "ws": "^8.21.0"
+  }
+}

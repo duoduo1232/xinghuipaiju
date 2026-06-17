@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.codex/
+.vscode/
+node_modules/
+dist/
+android/.gradle/
+android/**/build/
+android/local.properties
+.tmp-chrome-goal/
+ui-*.png
