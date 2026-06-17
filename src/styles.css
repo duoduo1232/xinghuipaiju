@@ -217,6 +217,18 @@ button:not(:disabled) {
   color: #2f5d91;
 }
 
+.update-proxy-preview {
+  padding: 6px 8px;
+  overflow: hidden;
+  color: #48617f;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .update-actions {
   justify-content: flex-start;
   flex-wrap: wrap;

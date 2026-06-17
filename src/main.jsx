@@ -43,6 +43,7 @@ const SELF_DESTRUCT_BURSTS = 3;
 const AI_PASS_SCORE_FLOOR = -80;
 const APP_VERSION = packageInfo.version ?? '0.0.0';
 const DEFAULT_UPDATE_REPO = '';
+const DEFAULT_UPDATE_PROXY = 'https://ghproxy.cxkpro.top';
 
 function getCardArtUrl(card) {
   if (card.artDataUrl) return card.artDataUrl;
@@ -203,6 +204,7 @@ const DEFAULT_SETTINGS = {
   uiScale: 100,
   fontScale: 100,
   updateRepo: DEFAULT_UPDATE_REPO,
+  updateProxy: DEFAULT_UPDATE_PROXY,
   developerCards: [],
 };
 
@@ -299,6 +301,7 @@ function getStoredSettings() {
       uiScale: Math.min(300, Math.max(1, Number(parsed.uiScale) || DEFAULT_SETTINGS.uiScale)),
       fontScale: Math.min(200, Math.max(50, Number(parsed.fontScale) || DEFAULT_SETTINGS.fontScale)),
       updateRepo: typeof parsed.updateRepo === 'string' ? parsed.updateRepo.trim() : DEFAULT_SETTINGS.updateRepo,
+      updateProxy: typeof parsed.updateProxy === 'string' ? normalizeUpdateProxy(parsed.updateProxy) : DEFAULT_SETTINGS.updateProxy,
       developerCards: Array.isArray(parsed.developerCards) ? parsed.developerCards : [],
     };
   } catch {
@@ -332,6 +335,22 @@ function normalizeGitHubRepo(repo = '') {
     .replace(/\/releases.*$/i, '')
     .replace(/\.git$/i, '')
     .replace(/^\/+|\/+$/g, '');
+}
+
+function normalizeUpdateProxy(proxy = '') {
+  const trimmed = String(proxy).trim().replace(/\/+$/g, '');
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function proxyGitHubDownloadUrl(url, proxy = DEFAULT_UPDATE_PROXY) {
+  const normalizedProxy = normalizeUpdateProxy(proxy);
+  if (!url || !normalizedProxy) return url;
+  if (!/^https?:\/\/(?:github\.com|raw\.githubusercontent\.com|objects\.githubusercontent\.com)\//i.test(url)) {
+    return url;
+  }
+  if (url.startsWith(`${normalizedProxy}/`)) return url;
+  return `${normalizedProxy}/${url}`;
 }
 
 async function checkGitHubUpdate(repo, signal) {
@@ -3145,6 +3164,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       uiScale: Math.min(300, Math.max(1, Number(draftSettings.uiScale) || 100)),
       fontScale: Math.min(200, Math.max(50, Number(draftSettings.fontScale) || 100)),
       updateRepo: normalizeGitHubRepo(draftSettings.updateRepo),
+      updateProxy: normalizeUpdateProxy(draftSettings.updateProxy),
     });
     setSettingsOpen(false);
   }
@@ -3173,7 +3193,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
   }
 
   function openUpdateDownload() {
-    const url = updateState.result?.url;
+    const url = proxyGitHubDownloadUrl(updateState.result?.url, draftSettings.updateProxy);
     if (!url) return;
     window.open(url, '_blank', 'noopener,noreferrer') || window.location.assign(url);
   }
@@ -3290,6 +3310,13 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
               onChange={(event) => setDraftSettings((current) => ({ ...current, updateRepo: event.target.value }))}
               placeholder="用户名/仓库名"
             />
+            <label htmlFor="update-proxy">更新加速节点</label>
+            <input
+              id="update-proxy"
+              value={draftSettings.updateProxy ?? DEFAULT_UPDATE_PROXY}
+              onChange={(event) => setDraftSettings((current) => ({ ...current, updateProxy: event.target.value }))}
+              placeholder={DEFAULT_UPDATE_PROXY}
+            />
             <section className={`update-panel ${updateState.status}`}>
               <div className="update-version-row">
                 <span>当前版本</span>
@@ -3306,6 +3333,9 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                     下载新版
                   </button>
                 ) : null}
+              </div>
+              <div className="update-proxy-preview">
+                节点：{normalizeUpdateProxy(draftSettings.updateProxy) || '不使用加速'}
               </div>
               {updateState.message ? <p>{updateState.message}</p> : <p>发布 GitHub Release 后，手机端可在这里检查并下载 APK。</p>}
             </section>
