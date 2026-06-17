@@ -28,7 +28,7 @@ await build({
           return {
             loader: 'jsx',
             contents: source.replace(
-              /const CARD_ART_MODULES = import\.meta\.glob\([\s\S]*?\);\n/,
+              /const CARD_ART_MODULES = import\.meta\.glob\([\s\S]*?\r?\n\}\);\r?\n/,
               'const CARD_ART_MODULES = {};\n',
             ),
           };

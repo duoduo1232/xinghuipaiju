@@ -393,7 +393,6 @@ button:not(:disabled) {
   .switcher button,
   .slot-title,
   .small-card span,
-  .hidden-back span,
   .line-label,
   .unit-card strong,
   .unit-card small,
@@ -539,6 +538,7 @@ button:not(:disabled) {
 
 .icon-button,
 .coin-button,
+.top-tool-button,
 .detail-close,
 .inspect-card,
 .primary-action,
@@ -637,6 +637,23 @@ button:not(:disabled) {
   place-items: center;
   width: 36px;
   height: 36px;
+}
+
+.top-tool-button {
+  min-width: 74px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.top-tool-button svg {
+  flex: 0 0 auto;
 }
 
 .switcher {
@@ -969,11 +986,14 @@ button:not(:disabled) {
 
 .hidden-back span {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #7a48bd;
+  font-size: 10px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .hidden-back img {
@@ -1070,6 +1090,7 @@ button:not(:disabled) {
 .mini-action:hover,
 .icon-button:hover,
 .coin-button:hover,
+.top-tool-button:hover,
 .switcher button:hover {
   transform: translateY(-1px);
   filter: brightness(1.05);
@@ -1245,6 +1266,11 @@ button:not(:disabled) {
   z-index: 10000;
   filter: saturate(1.08) brightness(1.04);
   box-shadow: 0 0 0 3px rgba(87, 157, 220, 0.72), 0 14px 24px rgba(42, 66, 103, 0.28);
+}
+
+.hand-card-wrap.selected .inspect-card {
+  z-index: 10002;
+  transform: scale(1.05);
 }
 
 .hand-card-wrap.disabled .card-mini {
@@ -2575,6 +2601,14 @@ button:not(:disabled) {
     height: 28px;
   }
 
+  .top-tool-button {
+    min-width: 62px;
+    height: 28px;
+    padding: 0 7px;
+    gap: 4px;
+    font-size: 10px;
+  }
+
   .table-topbar p {
     font-size: 10px;
   }
@@ -2908,6 +2942,13 @@ button:not(:disabled) {
   .coin-button {
     width: 31px;
     height: 31px;
+  }
+
+  .top-tool-button {
+    min-width: 66px;
+    height: 30px;
+    padding: 0 8px;
+    font-size: 11px;
   }
 
   .table-topbar p {
@@ -3384,6 +3425,19 @@ button:not(:disabled) {
   .coin-button {
     width: 24px;
     height: 24px;
+  }
+
+  .top-tool-button {
+    min-width: 52px;
+    height: 24px;
+    padding: 0 5px;
+    gap: 3px;
+    font-size: 9px;
+  }
+
+  .top-tool-button svg {
+    width: 13px;
+    height: 13px;
   }
 
   .table-topbar p {

@@ -121,7 +121,7 @@ function isCharacterLike(card) {
 }
 
 function isHiddenLike(card) {
-  return card.type === 'hidden' || card.tags?.includes('暗置') || card.tags?.includes('鏆楃疆');
+  return card.type === 'hidden' || card.tags?.includes('暗置');
 }
 
 function boardZoneOf(card) {
@@ -462,6 +462,21 @@ function advanceActionCursor(game, note) {
   };
   if (!note) return { ...game, actionState };
   return { ...game, actionState, log: [note, ...game.log] };
+}
+
+function visibleLogLine(line, game, viewerId) {
+  let text = String(line ?? '');
+  Object.values(game.players).forEach((player) => {
+    if (player.id === viewerId) return;
+    const marker = `${player.label}的暗置《`;
+    while (text.includes(marker)) {
+      const start = text.indexOf(marker);
+      const end = text.indexOf('》', start + marker.length);
+      if (end < 0) break;
+      text = `${text.slice(0, start)}${player.label}的暗置牌${text.slice(end + 1)}`;
+    }
+  });
+  return text;
 }
 
 function canPlayCard(game, playerId, card) {
@@ -1159,7 +1174,6 @@ function hasEquipment(player, id) {
 function isGearCard(card) {
   return Boolean(card.gear)
     || card.tags?.includes('齿轮')
-    || card.tags?.includes('榻胯疆')
     || [
       'skill_transfer',
       'skill_memory_inspect',
@@ -1936,11 +1950,11 @@ function playCard(game, playerId, card) {
     player.hidden.push({
       ...makeCharacterState(used),
       type: 'hidden',
-      subType: '??',
+      subType: 'character',
       actionCount: 1,
       playedTurn: game.turn,
     });
-    message = `${player.label}????${used.name}??`;
+    message = `${player.label}暗置了《${used.name}》。`;
   } else if (used.type === 'character') {
     player.characters.push(makeCharacterState(used));
   }
@@ -1952,7 +1966,7 @@ function playCard(game, playerId, card) {
       ? makeCharacterState(used)
       : { ...used, currentHp: used.hp, shield: used.shield ?? 0 };
     player.hidden.push({ ...hiddenCard, playedTurn: game.turn });
-    message = `${player.label}????${used.name}??`;
+    message = `${player.label}暗置了《${used.name}》。`;
   }
   if (used.effect === 'cleanedOne') {
     Object.values(players).forEach((item) => {
@@ -2786,7 +2800,21 @@ function App() {
       updateGame((current) => runAiStep(current, 'p2', { allowCycle: false }).game, { sync: false });
     }, currentStep === 'play' ? 720 : 820);
     return () => window.clearTimeout(timer);
-  }, [isAiTurn, victor, targetRequest, cycleRequest, game.phase, game.turn, game.matchId, game.actionState?.cursor, currentStep]);
+  }, [
+    isAiTurn,
+    victor,
+    targetRequest,
+    cycleRequest,
+    game.phase,
+    game.turn,
+    game.matchId,
+    game.actionState?.cursor,
+    game.players.p2.hand.length,
+    game.players.p2.skill,
+    game.players.p2.pollution,
+    game.log.length,
+    currentStep,
+  ]);
 
   useEffect(() => {
     if (screen !== 'game') return;
@@ -2927,18 +2955,20 @@ function App() {
       <section className="game-table" onPointerDown={clearSelectedCardOnBlank}>
         <header className="table-topbar">
           <button
-            className="icon-button"
+            className="top-tool-button"
             onClick={backToStart}
             aria-label="重新开始"
           >
-            <RotateCcw size={18} />
+            <RotateCcw size={17} />
+            <span>主界面</span>
           </button>
           <div>
             <p>第 {game.turn} 回合</p>
             <h1>{statusText}</h1>
           </div>
-          <button className="coin-button" onClick={() => setCoinReady(true)} aria-label="抛硬币动画">
-            <Coins size={18} />
+          <button className="top-tool-button" onClick={() => setCoinReady(true)} aria-label="抛硬币动画">
+            <Coins size={17} />
+            <span>硬币</span>
           </button>
         </header>
 
@@ -3091,7 +3121,7 @@ function App() {
             <p className="drawer-status">{statusText}</p>
             <div className="drawer-log">
               {game.log.slice(0, 8).map((item, index) => (
-                <p key={`${item}-${index}`}>{item}</p>
+                <p key={`${item}-${index}`}>{visibleLogLine(item, game, selectedPlayer)}</p>
               ))}
             </div>
           </div>
@@ -3632,7 +3662,7 @@ function PlayerBoard({ player, perspective, inspected, onInspect }) {
       </div>
       <div className="slots">
         <SlotGroup icon={<Shield size={14} />} title="装备" cards={player.equipment} limit={2} mode="mini" onInspect={onInspect} />
-        <SlotGroup icon={<Zap size={14} />} title="??" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
+        <SlotGroup icon={<Zap size={14} />} title="场景" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
         <SlotGroup
           icon={<Eye size={14} />}
           title="暗置"
@@ -3770,7 +3800,7 @@ function targetEffectSummary(card, actor) {
 }
 
 function PlayCardBurst({ card }) {
-  const hasGear = card.gear || card.tags?.includes('榻胯疆');
+  const hasGear = card.gear || card.tags?.includes('齿轮');
   return (
     <div className="play-card-burst" aria-hidden="true">
       <div
@@ -3790,7 +3820,7 @@ function PlayCardBurst({ card }) {
         <small className="frame-type">{CARD_TYPES[card.type]}</small>
         {isCharacterLike(card) && (
           <em className="frame-stats">
-            {card.atk} 鏀?/ {card.hp == null ? '鐗规畩' : `${card.hp} 琛€`}
+            {card.atk} 攻 / {card.hp == null ? '特殊' : `${card.hp} 血`}
           </em>
         )}
       </div>
@@ -3889,7 +3919,7 @@ function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
               >
                 <CardArt card={character} className="target-art" />
                 <strong>{character.name}</strong>
-                <span>{character.currentHp == null ? '????' : `${character.currentHp} ??`}</span>
+                <span>{character.currentHp == null ? '特殊' : `${character.currentHp} 血`}</span>
               </button>
               {actor?.actionSpiritDamage ? (
                 <button
@@ -3898,7 +3928,7 @@ function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
                 >
                   <CardArt card={character} className="target-art" />
                   <strong>{character.name}</strong>
-                  <span>-{actor.actionSpiritDamage} ???</span>
+                  <span>-{actor.actionSpiritDamage} 精神力</span>
                 </button>
               ) : null}
             </React.Fragment>
