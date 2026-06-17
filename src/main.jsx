@@ -367,11 +367,15 @@ function normalizeLanUrl(input = '') {
   if (/^https?:\/\//i.test(candidate)) {
     candidate = candidate.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
   } else if (!/^wss?:\/\//i.test(candidate)) {
-    candidate = `ws://${candidate}`;
+    const securePage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    candidate = `${securePage ? 'wss' : 'ws'}://${candidate}`;
   }
 
   const url = new URL(candidate);
   if (url.protocol !== 'ws:' && url.protocol !== 'wss:') url.protocol = 'ws:';
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.protocol === 'ws:') {
+    url.protocol = 'wss:';
+  }
   if (!hasProtocol && !url.port) {
     url.port = '8781';
   }
@@ -2606,7 +2610,7 @@ function App() {
         socket.send(JSON.stringify({ type: 'name', seat: localSeat, name: playerName }));
       };
       socket.onclose = () => setNetStatus('局域网已断开');
-      socket.onerror = () => setNetError('连接失败，请检查服务器地址、端口、防火墙或公网转发。');
+      socket.onerror = () => setNetError('连接失败。HTTPS 网页必须使用 wss://，请确认服务器支持 WSS，或在 APK/HTTP 页面里连接 ws://。');
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
