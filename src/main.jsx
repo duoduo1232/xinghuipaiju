@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ChevronLeft, ChevronRight, Cog, Coins, Download, Eye, Info, Play, RefreshCw, RotateCcw, Shield, Swords, X, Zap } from 'lucide-react';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import packageInfo from '../package.json';
 import cardFrameUrl from '../1.png';
 import cardBackUrl from './assets/card-back.png';
@@ -45,6 +46,7 @@ const AI_PASS_SCORE_FLOOR = -80;
 const APP_VERSION = packageInfo.version ?? '0.0.0';
 const DEFAULT_UPDATE_REPO = APP_CONFIG.updateRepo;
 const DEFAULT_UPDATE_PROXY = APP_CONFIG.updateProxy;
+const NativeUpdater = registerPlugin('NativeUpdater');
 
 function getCardArtUrl(card) {
   if (card.artDataUrl) return card.artDataUrl;
@@ -3249,10 +3251,37 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
     }
   }
 
-  function openUpdateDownload() {
+  async function openUpdateDownload() {
     const url = proxyGitHubDownloadUrl(updateState.result?.url, draftSettings.updateProxy);
     if (!url) return;
-    window.open(url, '_blank', 'noopener,noreferrer') || window.location.assign(url);
+    if (!Capacitor.isNativePlatform()) {
+      window.open(url, '_blank', 'noopener,noreferrer') || window.location.assign(url);
+      return;
+    }
+
+    setUpdateState((current) => ({
+      ...current,
+      status: 'downloading',
+      message: '正在应用内下载 APK，下载完成后会打开安装界面。',
+    }));
+
+    try {
+      await NativeUpdater.downloadAndInstall({
+        url,
+        fileName: updateState.result?.apkName || `xinghui-${updateState.result?.tag || APP_VERSION}.apk`,
+      });
+      setUpdateState((current) => ({
+        ...current,
+        status: 'installing',
+        message: 'APK 已下载，正在打开系统安装界面。',
+      }));
+    } catch (error) {
+      setUpdateState((current) => ({
+        ...current,
+        status: 'error',
+        message: error instanceof Error ? error.message : '下载安装失败',
+      }));
+    }
   }
 
   function addDeveloperCard() {
@@ -3385,10 +3414,15 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                   <RefreshCw size={14} />
                   {updateState.status === 'checking' ? '检查中' : '检查更新'}
                 </button>
-                {updateState.result?.url && updateState.status === 'ready' ? (
-                  <button type="button" className="primary-action" onClick={openUpdateDownload}>
+                {updateState.result?.url && ['ready', 'installing'].includes(updateState.status) ? (
+                  <button
+                    type="button"
+                    className="primary-action"
+                    onClick={openUpdateDownload}
+                    disabled={updateState.status === 'installing'}
+                  >
                     <Download size={14} />
-                    下载新版
+                    {updateState.status === 'installing' ? '安装中' : '下载并安装'}
                   </button>
                 ) : null}
               </div>
