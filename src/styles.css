@@ -257,6 +257,34 @@ button:not(:disabled) {
   flex-wrap: wrap;
 }
 
+.update-progress {
+  display: grid;
+  gap: 5px;
+}
+
+.update-progress strong {
+  color: #2f5d91;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.update-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(108, 136, 176, 0.42);
+  border-radius: 999px;
+  background: rgba(221, 231, 242, 0.9);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.update-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7fb6ff, #5c7fe0);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
 .update-panel p {
   margin: 0;
   color: #5a6d8c;

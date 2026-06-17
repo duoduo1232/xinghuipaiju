@@ -54,6 +54,7 @@ public class NativeUpdaterPlugin extends Plugin {
         if (status < 200 || status >= 300) {
             throw new Exception("Download failed, server returned " + status);
         }
+        long totalBytes = connection.getContentLengthLong();
 
         File dir = new File(getContext().getCacheDir(), "updates");
         if (!dir.exists() && !dir.mkdirs()) {
@@ -64,14 +65,31 @@ public class NativeUpdaterPlugin extends Plugin {
         try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(apkFile)) {
             byte[] buffer = new byte[8192];
             int read;
+            long downloadedBytes = 0;
+            notifyDownloadProgress(0, totalBytes);
             while ((read = input.read(buffer)) != -1) {
                 output.write(buffer, 0, read);
+                downloadedBytes += read;
+                notifyDownloadProgress(downloadedBytes, totalBytes);
             }
         } finally {
             connection.disconnect();
         }
 
+        if (totalBytes > 0) {
+            notifyDownloadProgress(totalBytes, totalBytes);
+        }
         return apkFile;
+    }
+
+    private void notifyDownloadProgress(long downloadedBytes, long totalBytes) {
+        JSObject payload = new JSObject();
+        payload.put("downloaded", downloadedBytes);
+        payload.put("total", totalBytes);
+        if (totalBytes > 0) {
+            payload.put("percent", Math.max(0, Math.min(100, Math.round((downloadedBytes * 100f) / totalBytes))));
+        }
+        notifyListeners("downloadProgress", payload, true);
     }
 
     private void openInstaller(File apkFile) {

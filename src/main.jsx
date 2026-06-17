@@ -356,6 +356,32 @@ function normalizeUpdateProxy(proxy = '') {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function normalizeLanUrl(input = '') {
+  const trimmed = String(input).trim();
+  if (!trimmed) {
+    throw new Error('请填写局域网地址，例如 ws://192.168.1.5:8781');
+  }
+
+  let candidate = trimmed;
+  if (/^https?:\/\//i.test(candidate)) {
+    candidate = candidate.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
+  } else if (!/^wss?:\/\//i.test(candidate)) {
+    candidate = `ws://${candidate}`;
+  }
+
+  const url = new URL(candidate);
+  if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
+    throw new Error('局域网地址格式不对，例如 ws://192.168.1.5:8781');
+  }
+  if (!url.hostname) {
+    throw new Error('局域网地址格式不对，例如 ws://192.168.1.5:8781');
+  }
+  if (!url.port) {
+    url.port = '8781';
+  }
+  return url;
+}
+
 function proxyGitHubDownloadUrl(url, proxy = DEFAULT_UPDATE_PROXY) {
   const normalizedProxy = normalizeUpdateProxy(proxy);
   if (!url || !normalizedProxy) return url;
@@ -2573,7 +2599,7 @@ function App() {
     setNetReady({ local: false, remote: false });
     setP2pStarted(false);
     try {
-      const url = new URL(lanUrl.trim());
+      const url = normalizeLanUrl(lanUrl);
       url.searchParams.set('room', lanRoom.trim() || 'room1');
       url.searchParams.set('name', playerName);
       const socket = new WebSocket(url.toString());
@@ -2621,7 +2647,7 @@ function App() {
         }
       };
     } catch (error) {
-      setNetError('局域网地址格式不对，例如 ws://电脑IP:8781');
+      setNetError(error instanceof Error ? error.message : '局域网地址格式不对，例如 ws://192.168.1.5:8781');
     }
   }
 
@@ -3201,6 +3227,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
   const [developerOpen, setDeveloperOpen] = useState(false);
   const [devCard, setDevCard] = useState({ name: '', type: 'skill', artName: '', artDataUrl: '', code: '' });
   const [updateState, setUpdateState] = useState({ status: 'idle', message: '', result: null });
+  const [updateProgress, setUpdateProgress] = useState(0);
 
   useEffect(() => {
     setDraftName(playerName);
@@ -3209,6 +3236,23 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
   useEffect(() => {
     setDraftSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let handle = null;
+    let active = true;
+    NativeUpdater.addListener('downloadProgress', (event) => {
+      if (!active) return;
+      const percent = Number.isFinite(event?.percent) ? Math.max(0, Math.min(100, event.percent)) : null;
+      if (percent != null) setUpdateProgress(percent);
+    }).then((listener) => {
+      handle = listener;
+    });
+    return () => {
+      active = false;
+      handle?.remove?.();
+    };
+  }, []);
 
   function saveName(event) {
     event.preventDefault();
@@ -3264,12 +3308,14 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       status: 'downloading',
       message: '正在应用内下载 APK，下载完成后会打开安装界面。',
     }));
+    setUpdateProgress(0);
 
     try {
       await NativeUpdater.downloadAndInstall({
         url,
         fileName: updateState.result?.apkName || `xinghui-${updateState.result?.tag || APP_VERSION}.apk`,
       });
+      setUpdateProgress(100);
       setUpdateState((current) => ({
         ...current,
         status: 'installing',
@@ -3281,6 +3327,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
         status: 'error',
         message: error instanceof Error ? error.message : '下载安装失败',
       }));
+      setUpdateProgress(0);
     }
   }
 
@@ -3426,6 +3473,14 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                   </button>
                 ) : null}
               </div>
+              {['downloading', 'installing'].includes(updateState.status) ? (
+                <div className="update-progress" aria-label={`下载进度 ${Math.round(updateProgress)}%`}>
+                  <div className="update-progress-track">
+                    <span style={{ width: `${Math.max(0, Math.min(100, updateProgress))}%` }} />
+                  </div>
+                  <strong>{Math.round(updateProgress)}%</strong>
+                </div>
+              ) : null}
               <div className="update-proxy-preview">
                 节点：{normalizeUpdateProxy(draftSettings.updateProxy) || '不使用加速'}
               </div>
