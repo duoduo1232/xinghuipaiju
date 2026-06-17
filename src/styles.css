@@ -3712,10 +3712,11 @@ button:not(:disabled) {
   .hand-card-wrap {
     flex-basis: 70px;
     margin-left: -8px;
+    transform: translateY(-14px) scale(var(--hand-card-scale, 1));
   }
 
   .hand-card-wrap.selected {
-    transform: translateY(-18px) scale(calc(var(--hand-card-scale, 1) * 1.16));
+    transform: translateY(-22px) scale(calc(var(--hand-card-scale, 1) * 1.16));
   }
 
   .card-mini {
