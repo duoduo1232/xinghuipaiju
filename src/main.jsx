@@ -364,18 +364,19 @@ function normalizeLanUrl(input = '') {
 
   let candidate = trimmed;
   const hasProtocol = /^(?:https?|wss?):\/\//i.test(candidate);
+  const securePage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const explicitPlainWs = /^ws:\/\//i.test(candidate) || /^http:\/\//i.test(candidate);
+  if (securePage && explicitPlainWs) {
+    throw new Error('HTTPS 网页不能连接 ws://。请用 APK、HTTP 页面，或把联机服务器配置成真正的 wss://。');
+  }
   if (/^https?:\/\//i.test(candidate)) {
     candidate = candidate.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
   } else if (!/^wss?:\/\//i.test(candidate)) {
-    const securePage = typeof window !== 'undefined' && window.location.protocol === 'https:';
     candidate = `${securePage ? 'wss' : 'ws'}://${candidate}`;
   }
 
   const url = new URL(candidate);
   if (url.protocol !== 'ws:' && url.protocol !== 'wss:') url.protocol = 'ws:';
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.protocol === 'ws:') {
-    url.protocol = 'wss:';
-  }
   if (!hasProtocol && !url.port) {
     url.port = '8781';
   }

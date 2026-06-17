@@ -27,6 +27,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 button {
@@ -53,8 +55,8 @@ button:not(:disabled) {
   height: min(860px, calc(100vh - 20px));
   transform: translate(var(--game-offset-x, 0px), var(--game-offset-y, 0px));
   display: grid;
-  grid-template-rows: 50px 32px minmax(0, 1fr) auto;
-  overflow: visible;
+  grid-template-rows: 50px 32px minmax(400px, 1fr) 204px;
+  overflow: hidden;
   border-radius: 28px;
   border: 4px solid rgba(87, 110, 144, 0.5);
   background: rgba(248, 242, 228, 0.62);
@@ -1253,7 +1255,6 @@ button:not(:disabled) {
   z-index: 10000;
   display: block;
   overflow: visible;
-  min-height: clamp(178px, calc(154px * var(--hand-card-scale, 1) + 32px), 320px);
   padding: 10px 24px 14px;
   background: linear-gradient(180deg, rgba(255, 252, 245, 0.96), rgba(237, 227, 214, 0.98));
   border-top: 1px solid rgba(117, 139, 169, 0.22);
@@ -2654,7 +2655,7 @@ button:not(:disabled) {
     height: 100vh;
     border-radius: 0;
     border-width: 0;
-    grid-template-rows: 34px 22px minmax(0, 1fr) clamp(146px, calc(124px * var(--hand-card-scale, 1) + 34px), 260px);
+    grid-template-rows: 34px 22px minmax(0, 1fr) 112px;
   }
 
   .game-table::before,
@@ -2997,7 +2998,7 @@ button:not(:disabled) {
     height: 100vh;
     border-radius: 0;
     border-width: 0;
-    grid-template-rows: 40px 26px minmax(0, 1fr) clamp(156px, calc(124px * var(--hand-card-scale, 1) + 36px), 270px);
+    grid-template-rows: 40px 26px minmax(0, 1fr) 132px;
   }
 
   .game-table::before,
@@ -3391,7 +3392,7 @@ button:not(:disabled) {
 
 @media (orientation: landscape) and (max-height: 520px) {
   .game-table {
-    grid-template-rows: 34px 22px minmax(0, 1fr) clamp(148px, calc(124px * var(--hand-card-scale, 1) + 34px), 260px);
+    grid-template-rows: 34px 22px minmax(0, 1fr) 112px;
   }
 
   .battlefield {
@@ -3446,7 +3447,6 @@ button:not(:disabled) {
   }
 
   .hand-tray {
-    min-height: clamp(148px, calc(124px * var(--hand-card-scale, 1) + 34px), 260px);
     padding: 4px 6px 6px;
   }
 
