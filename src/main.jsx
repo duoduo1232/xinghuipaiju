@@ -3144,8 +3144,8 @@ function App() {
         '--font-scale': (settings.fontScale ?? 100) / 100,
         '--hand-card-scale': (settings.handCardScale ?? DEFAULT_SETTINGS.handCardScale) / 100,
         '--board-card-scale': (settings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale) / 100,
-        '--game-window-offset-x': `${settings.gameOffsetX ?? 0}px`,
-        '--game-window-offset-y': `${settings.gameOffsetY ?? 0}px`,
+        '--app-window-offset-x': `${settings.gameOffsetX ?? 0}px`,
+        '--app-window-offset-y': `${settings.gameOffsetY ?? 0}px`,
         fontSize: `${settings.fontScale ?? 100}%`,
       }}
     >
@@ -3536,6 +3536,8 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
         '--ui-scale': (settings.uiScale ?? 100) / 100,
         '--font-scale': (settings.fontScale ?? 100) / 100,
         '--start-scale': (settings.startScale ?? DEFAULT_SETTINGS.startScale) / 100,
+        '--app-window-offset-x': `${settings.gameOffsetX ?? 0}px`,
+        '--app-window-offset-y': `${settings.gameOffsetY ?? 0}px`,
         fontSize: `${settings.fontScale ?? 100}%`,
       }}
     >
