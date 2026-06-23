@@ -438,6 +438,15 @@ function testWoodTreeGivesSkill() {
   assert(next.players.p1.skill === 5, `Wood Tree should grant +1 skill at new round under the 5 skill cap, got ${next.players.p1.skill}`);
 }
 
+function testWoodTreeHasNoManualActionTarget() {
+  const g = game();
+  g.phase = 'p2:play';
+  g.players.p2.hidden = [core.makeCharacterState(card('hidden_wood_tree'))];
+  const next = core.nextPhase(g);
+  assert(next.phase === 'p2:action', 'Next phase should enter P2 action phase.');
+  assert(next.actionState?.queue.length === 0, 'Wood Tree is a passive skill-point character and should not ask for an action target.');
+}
+
 function testDeveloperCardsEnterDeck() {
   const customCards = [{
     id: 'custom_heal_test',
@@ -466,6 +475,42 @@ function testAiPlaysLowUtilityPlayableCard() {
   assert(next.playedCard?.id === 'skill_memory_inspect', 'AI should play a low-utility playable card instead of passing or cycling first.');
   assert(!next.cycled && !next.advanced, 'AI should not cycle or advance while it can play a card.');
   assert(next.game.players.p2.hand.length === 0, 'AI played card should leave the hand.');
+}
+
+function testAiPrioritizesLethalSkillCard() {
+  const g = game();
+  g.phase = 'p2:play';
+  g.players.p1.hp = 40;
+  g.players.p2.hand = [card('skill_memory_inspect'), card('skill_bangbang')];
+  const next = core.runAiStep(g, 'p2', { allowCycle: true });
+  assert(next.playedCard?.id === 'skill_bangbang', `AI should use lethal true body strike, got ${next.playedCard?.id}`);
+  assert(next.game.players.p1.hp === 0, `AI lethal strike should defeat P1, got hp ${next.game.players.p1.hp}`);
+}
+
+function testAiTargetsHighThreatCharacterWithKill() {
+  const g = game();
+  g.phase = 'p2:play';
+  const saintess = core.makeCharacterState(card('char_saintess'));
+  const monster = core.makeCharacterState(card('char_monster'));
+  g.players.p1.characters = [saintess, monster];
+  g.players.p2.hand = [card('skill_kill')];
+  const next = core.runAiStep(g, 'p2', { allowCycle: true });
+  assert(next.playedCard?.id === 'skill_kill', 'AI should play Kill when a major threat is on board.');
+  assert(!next.game.players.p1.characters.some((item) => item.instanceId === monster.instanceId), 'AI Kill should remove the monster before weaker characters.');
+}
+
+function testAiCharacterActionTakesLethalBodyTarget() {
+  const g = game();
+  const actor = core.makeCharacterState(card('char_monster'));
+  const blocker = core.makeCharacterState(card('char_saintess'));
+  g.phase = 'p2:action';
+  g.players.p1.hp = 20;
+  g.players.p1.characters = [blocker];
+  g.players.p2.characters = [actor];
+  g.actionState = { playerId: 'p2', queue: [actor.instanceId], cursor: 0 };
+  const next = core.runAiStep(g, 'p2', { allowCycle: false });
+  assert(next.game.players.p1.hp === 0, `AI character action should choose lethal body target, got P1 hp ${next.game.players.p1.hp}`);
+  assert(next.game.players.p1.characters.length === 1, 'AI should not waste lethal action on a character first.');
 }
 
 function testCommonSkillAndHiddenEffects() {
@@ -586,8 +631,12 @@ const tests = [
   testAbyssMedicineItOrcaSleepingMemory,
   testDrawDoesNotReplaceFullHandAndSkillCap,
   testWoodTreeGivesSkill,
+  testWoodTreeHasNoManualActionTarget,
   testDeveloperCardsEnterDeck,
   testAiPlaysLowUtilityPlayableCard,
+  testAiPrioritizesLethalSkillCard,
+  testAiTargetsHighThreatCharacterWithKill,
+  testAiCharacterActionTakesLethalBodyTarget,
   testAiActionAutoAdvancesAfterSkippedCursor,
   testCommonSkillAndHiddenEffects,
   testDeathTriggeredScenesAndHiddenCards,

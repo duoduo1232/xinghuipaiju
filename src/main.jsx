@@ -589,9 +589,40 @@ function scoreAiCard(game, playerId, card) {
 
 function evaluateCharacterForAi(card) {
   const hp = card.currentHp ?? card.hp ?? 0;
+  const spirit = card.noSpirit ? 0 : (card.spirit ?? card.maxSpirit ?? card.hp ?? 0);
   const attack = Math.max(card.actionDamage ?? 0, card.actionBodyDamage ?? 0, card.actionCharacterDamage ?? 0, card.atk ?? 0);
   const shield = card.shield ?? 0;
-  return hp * 2.2 + attack * 5 + shield * 3 + (card.untargetableByAttack ? 8 : 0);
+  const actionValue = (card.actionCount ?? 1) * (
+    attack * 5
+    + (card.actionSpiritDamage ?? 0) * 4.5
+    + (card.actionPolluteEnemy ?? 0) * 1.4
+    + (card.actionShield ?? 0) * 7
+  );
+  return hp * 2.3
+    + spirit * 0.7
+    + actionValue
+    + shield * 7
+    + (card.taunt ? 14 : 0)
+    + (card.untargetableByAttack ? 18 : 0)
+    + (card.immuneCharacterDamage ? 16 : 0)
+    + (card.noSpirit ? 8 : 0);
+}
+
+function aiCharacterThreat(card) {
+  const hp = card.currentHp ?? card.hp ?? 0;
+  const spirit = card.noSpirit ? 0 : (card.spirit ?? card.maxSpirit ?? card.hp ?? 0);
+  const attack = Math.max(card.actionDamage ?? 0, card.actionBodyDamage ?? 0, card.actionCharacterDamage ?? 0, card.atk ?? 0);
+  return attack * 8
+    + (card.actionCount ?? 1) * 8
+    + (card.actionSpiritDamage ?? 0) * 6
+    + (card.actionPolluteEnemy ?? 0) * 2
+    + hp * 1.2
+    + spirit * 0.5
+    + (card.taunt ? 28 : 0)
+    + (card.untargetableByAttack ? 24 : 0)
+    + (card.immuneCharacterDamage ? 18 : 0)
+    + (card.id === 'char_monster' ? 24 : 0)
+    + (card.id === 'char_it' ? 36 : 0);
 }
 
 function totalHealthForFx(player) {
@@ -616,13 +647,7 @@ function selectableCardsForEffect(game, playerId, card) {
     return allBoardCharacters(player);
   }
   if (card.effect === 'itEnter') return enemy.characters;
-  if (card.effect === 'orcaEnter') {
-    return [
-      { ...card, instanceId: '__played_self', name: `${card.name}（自己）` },
-      ...player.characters,
-      ...enemy.characters,
-    ];
-  }
+  if (card.effect === 'orcaEnter') return enemy.characters;
   return [];
 }
 
@@ -643,21 +668,30 @@ function evaluateAiState(game, playerId) {
     + enemy.scenes.length * 14;
 
   let score = 0;
-  score += (player.hp - enemy.hp) * 8;
-  score += ((player.spirit ?? 0) - (enemy.spirit ?? 0)) * 4.5;
-  score += ((player.maxHp ?? PLAYER_BASE_HP) - (enemy.maxHp ?? PLAYER_BASE_HP)) * 3;
-  score += ((player.maxSpirit ?? PLAYER_BASE_SPIRIT) - (enemy.maxSpirit ?? PLAYER_BASE_SPIRIT)) * 2;
+  const playerHpRatio = player.hp / Math.max(1, player.maxHp ?? PLAYER_BASE_HP);
+  const enemyHpRatio = enemy.hp / Math.max(1, enemy.maxHp ?? PLAYER_BASE_HP);
+  const playerSpiritRatio = (player.spirit ?? 0) / Math.max(1, player.maxSpirit ?? PLAYER_BASE_SPIRIT);
+  const enemySpiritRatio = (enemy.spirit ?? 0) / Math.max(1, enemy.maxSpirit ?? PLAYER_BASE_SPIRIT);
+
+  score += (player.hp - enemy.hp) * 9.5;
+  score += ((player.spirit ?? 0) - (enemy.spirit ?? 0)) * 5.5;
+  score += ((player.maxHp ?? PLAYER_BASE_HP) - (enemy.maxHp ?? PLAYER_BASE_HP)) * 4.2;
+  score += ((player.maxSpirit ?? PLAYER_BASE_SPIRIT) - (enemy.maxSpirit ?? PLAYER_BASE_SPIRIT)) * 3.6;
   score += playerBoard - enemyBoard;
-  score += player.skill * 2.5 - enemy.skill * 1.2;
-  score += player.hand.length * 2 - enemy.hand.length * 1.5;
-  score += enemy.pollution * 0.45 - player.pollution * 0.9;
-  score += (enemy.pollutionBursts ?? 0) * 22 - (player.pollutionBursts ?? 0) * 34;
-  if (player.hp <= 5) score -= 45;
-  if ((player.spirit ?? 0) <= 0) score -= 80;
-  if ((enemy.spirit ?? 0) <= 0) score += 55;
-  if (player.pollution >= 80) score -= 45;
-  if (enemy.hp <= 8) score += 25;
-  if (enemy.pollution >= 80) score += 18;
+  score += player.skill * 6 - enemy.skill * 2.4;
+  score += player.hand.length * 4.2 - enemy.hand.length * 3;
+  score += enemy.pollution * 0.9 - player.pollution * 1.5;
+  score += (enemy.pollutionBursts ?? 0) * 42 - (player.pollutionBursts ?? 0) * 58;
+  if (player.hp <= 15) score -= 95;
+  if (playerHpRatio <= 0.25) score -= 90;
+  if ((player.spirit ?? 0) <= 0) score -= 160;
+  if (playerSpiritRatio <= 0.25) score -= 60;
+  if ((enemy.spirit ?? 0) <= 0) score += 130;
+  if (enemySpiritRatio <= 0.25) score += 55;
+  if (player.pollution >= (player.maxPollution ?? INITIAL_POLLUTION_LIMIT) - 20) score -= 85;
+  if (enemy.hp <= 40) score += (40 - enemy.hp) * 6;
+  if (enemyHpRatio <= 0.35) score += 85;
+  if (enemy.pollution >= (enemy.maxPollution ?? INITIAL_POLLUTION_LIMIT) - 20) score += 48;
   if (player.cannotPlayThisRound) score -= 12;
   if (player.physicalImmuneThisRound) score += 18;
   if (player.pollutionImmuneThisRound) score += 12;
@@ -707,12 +741,118 @@ function getAiCardPlan(game, playerId, card) {
   };
 }
 
+function selectedEffectPlans(game, playerId, card, before, contextBonus) {
+  const targets = selectableCardsForEffect(game, playerId, card);
+  if (targets.length === 0) return [];
+  return targets
+    .map((selection) => {
+      const nextGame = playSelectedEffectCard(game, playerId, card, selection);
+      if (nextGame === game) return null;
+      const targetBonus = selection ? aiCharacterThreat(selection) * 0.05 : 0;
+      return {
+        card,
+        selection,
+        game: nextGame,
+        score: evaluateAiState(nextGame, playerId) - before + contextBonus + targetBonus,
+      };
+    })
+    .filter(Boolean);
+}
+
+function selectedEnterPlans(game, playerId, card, before, contextBonus) {
+  const targets = selectableCardsForEffect(game, playerId, card);
+  if (targets.length === 0) return [];
+  return targets
+    .map((selection) => {
+      const nextGame = playSelectedEnterCard(game, playerId, card, selection);
+      if (nextGame === game) return null;
+      const targetBonus = selection?.instanceId === '__played_self' ? 6 : aiCharacterThreat(selection) * 0.08;
+      return {
+        card,
+        selection,
+        game: nextGame,
+        score: evaluateAiState(nextGame, playerId) - before + contextBonus + targetBonus,
+      };
+    })
+    .filter(Boolean);
+}
+
+function getAiCardPlans(game, playerId, card) {
+  const before = evaluateAiState(game, playerId);
+  const contextBonus = scoreAiCard(game, playerId, card) * 0.08;
+
+  if (card.effect === 'killTarget') {
+    return getKillTargets(game, playerId)
+      .map((target) => {
+        const nextGame = playTargetedKill(game, playerId, card, target);
+        const enemy = game.players[opponentOf(playerId)];
+        const targetCard = target.type === 'character'
+          ? enemy.characters.find((item) => item.instanceId === target.instanceId)
+          : null;
+        const highestEnemyThreat = enemy.characters.reduce((best, item) => Math.max(best, aiCharacterThreat(item)), 0);
+        const targetBonus = target.type === 'body'
+          ? (enemy.hp <= 40 ? 900 : (enemy.hp <= 65 ? 120 : -highestEnemyThreat * 1.2))
+          : aiCharacterThreat(targetCard) * 1.6;
+        return {
+          card,
+          target,
+          game: nextGame,
+          score: evaluateAiState(nextGame, playerId) - before + contextBonus + targetBonus,
+        };
+      });
+  }
+
+  if (['removeEnemyHidden', 'destroyEnemyScene', 'memorySceneRemove', 'feedingContract', 'shieldCard'].includes(card.effect)) {
+    const plans = selectedEffectPlans(game, playerId, card, before, contextBonus);
+    if (plans.length > 0) return plans;
+  }
+
+  if (['itEnter', 'orcaEnter'].includes(card.effect)) {
+    const plans = selectedEnterPlans(game, playerId, card, before, contextBonus);
+    if (plans.length > 0) return plans;
+  }
+
+  const plan = getAiCardPlan(game, playerId, card);
+  return plan ? [plan] : [];
+}
+
+function getAiCandidatePlans(game, playerId, limit = 8) {
+  const player = game.players[playerId];
+  return player.hand
+    .filter((card) => canPlayCard(game, playerId, card))
+    .flatMap((card) => getAiCardPlans(game, playerId, card))
+    .filter((plan) => plan && plan.game !== game)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+function evaluateAiSequence(game, playerId, depth) {
+  if (depth <= 0) return evaluateAiState(game, playerId);
+  const plans = getAiCandidatePlans(game, playerId, 6);
+  if (plans.length === 0) return evaluateAiState(game, playerId);
+  const passScore = evaluateAiState(game, playerId);
+  return plans.reduce((best, plan) => {
+    const futureScore = evaluateAiSequence(plan.game, playerId, depth - 1);
+    return Math.max(best, futureScore + plan.score * 0.08);
+  }, passScore);
+}
+
+function getAiBestPlan(game, playerId) {
+  const before = evaluateAiState(game, playerId);
+  const plans = getAiCandidatePlans(game, playerId, 10)
+    .map((plan) => ({
+      ...plan,
+      score: plan.score + (evaluateAiSequence(plan.game, playerId, 2) - before) * 0.35,
+    }))
+    .sort((a, b) => b.score - a.score);
+  return plans[0] ?? null;
+}
+
 function chooseKillTarget(game, playerId) {
-  const enemy = game.players[opponentOf(playerId)];
-  if (enemy.characters.length > 0) {
-    return enemy.characters
-      .slice()
-      .sort((a, b) => (a.currentHp ?? a.hp ?? 999) - (b.currentHp ?? b.hp ?? 999))[0];
+  const killCard = game.players[playerId].hand.find((card) => card.effect === 'killTarget');
+  if (killCard) {
+    const plan = getAiCardPlans(game, playerId, killCard).sort((a, b) => b.score - a.score)[0];
+    if (plan?.target) return plan.target;
   }
   return { type: 'body' };
 }
@@ -733,52 +873,46 @@ function chooseActionTarget(game, playerId, actor) {
     return { type: 'selfPolluteSkill' };
   }
 
-  if (actor.actionSpiritDamage && (enemy.spirit ?? 0) <= 50) {
-    return { type: 'spiritEnemy' };
+  const candidates = [];
+  const hasPhysicalAttack = (actor.actionDamage ?? actor.actionBodyDamage ?? actor.actionCharacterDamage ?? actor.atk ?? 0) > 0;
+  if (hasPhysicalAttack) candidates.push({ type: 'body' });
+  enemy.characters
+    .filter((card) => hasPhysicalAttack && !card.untargetableByAttack)
+    .forEach((card) => candidates.push({ type: 'character', instanceId: card.instanceId }));
+  if (actor.actionSpiritDamage) {
+    candidates.push({ type: 'spiritEnemy' });
+    enemy.characters
+      .filter((card) => card.spirit != null && !card.noSpirit)
+      .forEach((card) => candidates.push({ type: 'characterSpirit', instanceId: card.instanceId }));
   }
+  if (actor.actionPolluteEnemy && enemy.hp > 0) candidates.push({ type: 'polluteEnemy' });
+  if (actor.actionShield) candidates.push({ type: 'shieldSelf' });
 
-  if (actor.actionPolluteEnemy && enemy.hp > 0 && (player.hp <= 10 || enemy.pollution < 90)) {
-    return { type: 'polluteEnemy' };
-  }
+  const before = evaluateAiState(game, playerId);
+  const best = candidates
+    .map((target) => {
+      const nextGame = resolveCharacterAction(game, playerId, actor.instanceId, target);
+      if (nextGame === game) return null;
+      return {
+        target,
+        score: evaluateAiState(nextGame, playerId) - before,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)[0];
 
-  if (actor.actionShield && (player.hp <= 12 || !actor.actionDamage && !actor.actionBodyDamage && !actor.actionCharacterDamage)) {
-    return { type: 'shieldSelf' };
-  }
-
-  if (actor.actionSpiritDamage && !actor.actionDamage && !actor.actionBodyDamage && !actor.actionCharacterDamage) {
-    return { type: 'spiritEnemy' };
-  }
-
-  if (enemy.characters.length > 0) {
-    const targetCard = enemy.characters
-      .filter((card) => !card.untargetableByAttack)
-      .slice()
-      .sort((a, b) => (a.currentHp ?? a.hp ?? 999) - (b.currentHp ?? b.hp ?? 999))[0];
-    if (targetCard) return { type: 'character', instanceId: targetCard.instanceId };
-  }
-
-  return { type: 'body' };
+  if (best && best.score > -45) return best.target;
+  return null;
 }
 
 function chooseAiCard(game, playerId) {
-  const player = game.players[playerId];
-  const playable = player.hand.filter((card) => canPlayCard(game, playerId, card));
-  if (playable.length === 0) return null;
-  const plan = playable
-    .map((card) => getAiCardPlan(game, playerId, card))
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score)[0];
+  const plan = getAiBestPlan(game, playerId);
   if (!plan || plan.score <= AI_PASS_SCORE_FLOOR) return null;
   return plan.card;
 }
 
 function playAiCard(game, playerId) {
-  const player = game.players[playerId];
-  const plan = player.hand
-    .filter((card) => canPlayCard(game, playerId, card))
-    .map((card) => getAiCardPlan(game, playerId, card))
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score)[0];
+  const plan = getAiBestPlan(game, playerId);
   if (!plan || plan.score <= AI_PASS_SCORE_FLOOR) return { game, played: false };
   return { game: plan.game, played: true, card: plan.card };
 }
@@ -788,10 +922,14 @@ function chooseAiCycleCard(game, playerId) {
   if (player.skill < 1 || player.hand.length === 0) return null;
   return player.hand
     .map((card) => {
-      const plan = canPlayCard(game, playerId, card) ? getAiCardPlan(game, playerId, card) : null;
-      const deadWeightPenalty = card.cost > player.skill ? -12 : 0;
-      const dangerPenalty = (card.pollutionDelta ?? 0) >= 30 && player.pollution >= 60 ? -25 : 0;
-      return { card, score: plan?.score ?? deadWeightPenalty + dangerPenalty };
+      const plan = canPlayCard(game, playerId, card)
+        ? getAiCardPlans(game, playerId, card).sort((a, b) => b.score - a.score)[0]
+        : null;
+      const deadWeightPenalty = card.cost > player.skill ? -25 - card.cost * 2 : 0;
+      const dangerPenalty = (card.pollutionDelta ?? 0) >= 30 && player.pollution >= 55 ? -40 : 0;
+      const keepComboBonus = ['killTarget', 'trueBodyStrike', 'healSelf', 'restoreSpirit', 'reduceSelfPollution'].includes(card.effect) ? 35 : 0;
+      const boardCardBonus = ['character', 'scene', 'equipment', 'hidden'].includes(card.type) ? 18 : 0;
+      return { card, score: (plan?.score ?? deadWeightPenalty + dangerPenalty) + keepComboBonus + boardCardBonus };
     })
     .sort((a, b) => a.score - b.score)[0]?.card ?? null;
 }
@@ -1242,6 +1380,19 @@ function allBoardCharacters(player) {
   ];
 }
 
+function hasCharacterAction(card) {
+  return Boolean(
+    card.actionDamage
+    || card.actionBodyDamage
+    || card.actionCharacterDamage
+    || card.actionShield
+    || card.actionPolluteEnemy
+    || card.actionSelfPolluteForSkill
+    || card.actionSpiritDamage
+    || card.actionEffect
+  );
+}
+
 function hasFriendlyMtf(player) {
   return allBoardCharacters(player).some((card) => card.id === 'char_mtf_agent');
 }
@@ -1521,7 +1672,8 @@ function buildActionQueue(player) {
   return [
     ...player.characters,
     ...player.hidden.filter((card) => boardZoneOf(card) === 'characters'),
-  ].flatMap((card) => Array.from({ length: card.actionCount ?? 1 }, () => card.instanceId));
+  ].filter(hasCharacterAction)
+    .flatMap((card) => Array.from({ length: card.actionCount ?? 1 }, () => card.instanceId));
 }
 
 function discardThenDrawOne(game, playerId, discardedCardId) {
@@ -3955,7 +4107,7 @@ function targetEffectSummary(card, actor) {
   if (card.effect === 'feedingContract') return '移除我方非齿轮角色，本体+20血+8精神力+1技能点';
   if (card.effect === 'shieldCard') return '选择一个己方角色+1护盾';
   if (card.effect === 'itEnter') return '选择对方一个角色死亡';
-  if (card.effect === 'orcaEnter') return '选择一个角色，护盾失效';
+  if (card.effect === 'orcaEnter') return '选择对方角色，护盾失效';
   return card.text ?? '选择目标';
 }
 
