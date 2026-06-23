@@ -51,13 +51,13 @@ button:not(:disabled) {
 .game-shell {
   height: 100vh;
   overflow: hidden;
+  transform: translate(var(--game-window-offset-x, 0px), var(--game-window-offset-y, 0px));
 }
 
 .game-table {
   position: relative;
   width: min(1500px, calc(100vw - 20px));
   height: min(860px, calc(100vh - 20px));
-  transform: translate(var(--game-offset-x, 0px), var(--game-offset-y, 0px));
   display: grid;
   grid-template-rows: 50px 32px minmax(400px, 1fr) 204px;
   overflow: hidden;

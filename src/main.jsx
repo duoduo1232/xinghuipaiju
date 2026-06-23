@@ -2992,8 +2992,8 @@ function App() {
         '--font-scale': (settings.fontScale ?? 100) / 100,
         '--hand-card-scale': (settings.handCardScale ?? DEFAULT_SETTINGS.handCardScale) / 100,
         '--board-card-scale': (settings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale) / 100,
-        '--game-offset-x': `${settings.gameOffsetX ?? 0}px`,
-        '--game-offset-y': `${settings.gameOffsetY ?? 0}px`,
+        '--game-window-offset-x': `${settings.gameOffsetX ?? 0}px`,
+        '--game-window-offset-y': `${settings.gameOffsetY ?? 0}px`,
         fontSize: `${settings.fontScale ?? 100}%`,
       }}
     >
@@ -3521,7 +3521,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.startScale ?? DEFAULT_SETTINGS.startScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, startScale: event.target.value }))}
               />
-              <label htmlFor="game-offset-x">游戏界面左右移动 -300 到 300</label>
+              <label htmlFor="game-offset-x">游戏窗口左右移动 -300 到 300</label>
               <input
                 id="game-offset-x"
                 type="number"
@@ -3530,7 +3530,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.gameOffsetX ?? DEFAULT_SETTINGS.gameOffsetX}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, gameOffsetX: event.target.value }))}
               />
-              <label htmlFor="game-offset-y">游戏界面上下移动 -300 到 300</label>
+              <label htmlFor="game-offset-y">游戏窗口上下移动 -300 到 300</label>
               <input
                 id="game-offset-y"
                 type="number"
