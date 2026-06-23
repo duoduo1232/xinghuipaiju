@@ -2202,15 +2202,17 @@ function playCard(game, playerId, card) {
       const discardedByEnemy = discardGearMarkedCards(enemy);
       const extraDiscarded = discardOneFromHand(enemy);
       const totalDiscardedCards = discardedByPlayer + discardedByEnemy + (extraDiscarded ? 1 : 0);
+      const teleportHpLoss = 10 + totalDiscardedCards * 5;
 
       const extraLogs = [];
-      Object.values(players).forEach((item) => {
-        extraLogs.push(...applyPollutionChange(item, 20));
-        extraLogs.push(...applyPollutionChange(item, totalDiscardedCards * 10));
-        item.hp = clampHp(item.hp - 10 - totalDiscardedCards * 5);
-      });
+      extraLogs.push(...applyPollutionChange(player, 20));
+      extraLogs.push(...applyPollutionChange(player, totalDiscardedCards * 10));
+      extraLogs.push(...applyPollutionChange(enemy, 20));
+      extraLogs.push(...applyPollutionChange(enemy, totalDiscardedCards * 10));
+      enemy.hp = clampHp(enemy.hp - teleportHpLoss);
+      extraLogs.push(`${enemy.label}因《传送》-${teleportHpLoss}血。`);
 
-      message = `${player.label}使用《传送》，弃置己方${discardedByPlayer}张齿轮牌、敌方${discardedByEnemy}张齿轮牌；${extraDiscarded ? `${enemy.label}额外弃置《${extraDiscarded.name}》。` : `${enemy.label}没有手牌可额外弃置。`}本次共弃置${totalDiscardedCards}张牌，双方+${20 + totalDiscardedCards * 10}污染、-${10 + totalDiscardedCards * 5}血。`;
+      message = `${player.label}使用《传送》，弃置己方${discardedByPlayer}张齿轮牌、敌方${discardedByEnemy}张齿轮牌；${extraDiscarded ? `${enemy.label}额外弃置《${extraDiscarded.name}》。` : `${enemy.label}没有手牌可额外弃置。`}本次共弃置${totalDiscardedCards}张牌，双方+${20 + totalDiscardedCards * 10}污染，${enemy.label}-${teleportHpLoss}血。`;
       player.discard.push(used);
       return {
         ...game,

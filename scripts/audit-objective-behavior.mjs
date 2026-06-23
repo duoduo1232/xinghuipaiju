@@ -110,7 +110,7 @@ function testTeleportTotals() {
   g.players.p2.scenes = [card('scene_control_console')];
 
   const next = core.playCard(g, 'p1', transfer);
-  assert(next.players.p1.hp === 65, `Teleport should make P1 hp 65, got ${next.players.p1.hp}`);
+  assert(next.players.p1.hp === 100, `Teleport should not damage P1 body, got ${next.players.p1.hp}`);
   assert(next.players.p2.hp === 65, `Teleport should make P2 hp 65, got ${next.players.p2.hp}`);
   assert(next.players.p1.pollution === 80, `Teleport should make P1 pollution 80 including card value, got ${next.players.p1.pollution}`);
   assert(next.players.p2.pollution === 70, `Teleport should make P2 pollution 70, got ${next.players.p2.pollution}`);

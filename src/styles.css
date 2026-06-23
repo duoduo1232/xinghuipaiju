@@ -1289,8 +1289,7 @@ button:not(:disabled) {
   align-items: flex-end;
   justify-content: center;
   gap: 10px;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: visible;
   padding: 2px 42px 8px;
 }
 
