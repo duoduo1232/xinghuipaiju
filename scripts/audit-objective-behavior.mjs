@@ -456,14 +456,36 @@ function testDeveloperCardsEnterDeck() {
     code: '{"effect":"healSelf","value":7,"cost":1,"valueText":"+0","text":"Heal 7."}',
   }];
   const g = core.setupGame({ mode: 'pve', localName: 'Tester', customCards });
-  const allP1Cards = [
+  const allCards = [
     ...g.players.p1.hand,
-    ...g.players.p1.deck,
+    ...g.players.p2.hand,
+    ...g.deck,
   ];
-  const custom = allP1Cards.find((item) => item.id === 'custom_heal_test');
-  assert(custom, 'Developer card should be added to the actual deck.');
+  const custom = allCards.find((item) => item.id === 'custom_heal_test');
+  assert(custom, 'Developer card should be added to the shared actual deck.');
   assert(custom.effect === 'healSelf' && custom.value === 7, 'Developer card JSON skill code should merge into playable card fields.');
   assert(custom.artDataUrl === customCards[0].artDataUrl, 'Developer card uploaded art data should persist on deck cards.');
+}
+
+function testSetupUsesSharedDeck() {
+  const g = core.setupGame({ mode: 'pve', localName: 'Tester' });
+  const p1Ids = new Set(g.players.p1.hand.map((item) => item.id));
+  const p2Ids = new Set(g.players.p2.hand.map((item) => item.id));
+  const overlap = [...p1Ids].filter((id) => p2Ids.has(id));
+  assert(overlap.length === 0, `Opening hands should be dealt from one shared deck, duplicated ids: ${overlap.join(',')}`);
+  assert(g.deck.length === STARTING_DECK.length - 6, `Shared deck should have dealt 6 opening cards, got ${g.deck.length}`);
+  assert(g.players.p1.deck.length === 0 && g.players.p2.deck.length === 0, 'Players should not keep separate duplicated decks in normal games.');
+}
+
+function testSharedRoundDrawUsesOneDeck() {
+  const g = game();
+  g.deck = [card('food_bread'), card('skill_medicine'), card('skill_shadow')];
+  g.players.p1.hand = [card('char_saintess')];
+  g.players.p2.hand = [card('char_monster')];
+  core.drawRoundCards(g.players, g.deck);
+  assert(g.players.p1.hand.length === 3, `P1 should draw 2 from shared deck, got ${g.players.p1.hand.length}`);
+  assert(g.players.p2.hand.length === 2, `P2 should only draw remaining 1 shared card, got ${g.players.p2.hand.length}`);
+  assert(g.deck.length === 0, 'Shared deck should be consumed by both players in order.');
 }
 
 function testAiPlaysLowUtilityPlayableCard() {
@@ -633,6 +655,8 @@ const tests = [
   testWoodTreeGivesSkill,
   testWoodTreeHasNoManualActionTarget,
   testDeveloperCardsEnterDeck,
+  testSetupUsesSharedDeck,
+  testSharedRoundDrawUsesOneDeck,
   testAiPlaysLowUtilityPlayableCard,
   testAiPrioritizesLethalSkillCard,
   testAiTargetsHighThreatCharacterWithKill,

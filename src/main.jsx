@@ -165,8 +165,7 @@ function shuffle(cards) {
   return next;
 }
 
-function createPlayer(id, label, customCards = []) {
-  const deck = shuffle(makeDeck(id, customCards));
+function createPlayer(id, label) {
   return {
     id,
     label,
@@ -178,8 +177,8 @@ function createPlayer(id, label, customCards = []) {
     pollution: 0,
     maxPollution: INITIAL_POLLUTION_LIMIT,
     pollutionBursts: 0,
-    deck: deck.slice(STARTING_HAND_SIZE),
-    hand: deck.slice(0, STARTING_HAND_SIZE),
+    deck: [],
+    hand: [],
     characters: [],
     equipment: [],
     scenes: [],
@@ -469,12 +468,21 @@ function getSeatLabels(mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat 
 function setupGame({ mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 'p1', customCards = [] } = {}) {
   const first = Math.random() < 0.5 ? 'p1' : 'p2';
   const labels = getSeatLabels(mode, localName, localSeat);
+  const deck = shuffle(makeDeck('shared', customCards));
+  const players = {
+    p1: createPlayer('p1', labels.p1),
+    p2: createPlayer('p2', labels.p2),
+  };
+  const dealOrder = [first, opponentOf(first)];
+  for (let index = 0; index < STARTING_HAND_SIZE; index += 1) {
+    dealOrder.forEach((playerId) => {
+      if (deck.length > 0) players[playerId].hand.push(deck.shift());
+    });
+  }
   return {
     matchId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    players: {
-      p1: createPlayer('p1', labels.p1, customCards),
-      p2: createPlayer('p2', labels.p2, customCards),
-    },
+    players,
+    deck,
     first,
     turn: 1,
     phase: `${first}:play`,
@@ -1092,10 +1100,12 @@ function nextPhase(game) {
   const carriageLogs = applyAbandonedCarriage(players, game.turn + 1);
   const darknessLogs = applyDarknessStartTurn(players);
   const roundStartLogs = runRoundStartEffects(players);
-  const refillLogs = drawRoundCards(players);
+  const deck = game.deck ? [...game.deck] : null;
+  const refillLogs = drawRoundCards(players, deck);
   return {
     ...game,
     players,
+    ...(deck ? { deck } : {}),
     turn: game.turn + 1,
     phase: `${game.first}:play`,
     inspected: null,
@@ -1115,9 +1125,43 @@ function nextPhase(game) {
   };
 }
 
-function drawRoundCards(players) {
+function recycleSharedDeck(sharedDeck, players) {
+  if (!sharedDeck || sharedDeck.length > 0) return 0;
+  const recycled = [];
+  Object.values(players).forEach((player) => {
+    recycled.push(...player.discard);
+    player.discard = [];
+  });
+  sharedDeck.push(...shuffle(recycled));
+  return recycled.length;
+}
+
+function drawFromSharedDeck(player, count, sharedDeck, players) {
+  let drawn = 0;
+  const drawLimit = Math.max(0, Math.min(count, HAND_LIMIT - player.hand.length));
+  recycleSharedDeck(sharedDeck, players);
+  const availableThisDraw = sharedDeck.length;
+  while (drawn < drawLimit) {
+    if (drawn >= availableThisDraw || sharedDeck.length === 0) break;
+    player.hand.push(sharedDeck.shift());
+    drawn += 1;
+  }
+  return drawn;
+}
+
+function drawRoundCards(players, sharedDeck = null) {
   const logs = [];
   Object.values(players).forEach((player) => {
+    if (sharedDeck) {
+      const drawLimit = Math.max(0, Math.min(TURN_DRAW_COUNT, HAND_LIMIT - player.hand.length));
+      const recycled = sharedDeck.length === 0 ? recycleSharedDeck(sharedDeck, players) : 0;
+      const drawn = drawFromSharedDeck(player, TURN_DRAW_COUNT, sharedDeck, players);
+      if (recycled > 0) logs.push(`公共牌库摸空，将${recycled}张弃牌洗回牌库。`);
+      if (drawn > 0) logs.push(`${player.label}补摸${drawn}张牌。`);
+      if (drawLimit === 0) logs.push(`${player.label}手牌已满，不能继续摸牌。`);
+      if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}没有摸到牌。`);
+      return;
+    }
     let drawn = 0;
     let recycled = 0;
     const drawLimit = Math.max(0, Math.min(TURN_DRAW_COUNT, HAND_LIMIT - player.hand.length));
@@ -1149,7 +1193,8 @@ function enforceHandLimit(player) {
   return discarded;
 }
 
-function drawCards(player, count) {
+function drawCards(player, count, sharedDeck = null, players = null) {
+  if (sharedDeck) return drawFromSharedDeck(player, count, sharedDeck, players);
   let drawn = 0;
   const drawLimit = Math.max(0, Math.min(count, HAND_LIMIT - player.hand.length));
   if (player.deck.length === 0 && player.discard.length > 0) {
@@ -1678,6 +1723,7 @@ function buildActionQueue(player) {
 
 function discardThenDrawOne(game, playerId, discardedCardId) {
   const players = structuredClone(game.players);
+  const deck = game.deck ? [...game.deck] : null;
   const player = players[playerId];
   const cardIndex = player.hand.findIndex((card) => card.instanceId === discardedCardId);
   if (cardIndex < 0) return game;
@@ -1687,11 +1733,12 @@ function discardThenDrawOne(game, playerId, discardedCardId) {
   const [removed] = player.hand.splice(cardIndex, 1);
   player.discard.push(removed);
 
-  drawCards(player, 1);
+  drawCards(player, 1, deck, players);
 
   return {
     ...game,
     players,
+    ...(deck ? { deck } : {}),
     log: [`${player.label}花费1点技能点弃置《${removed.name}》，并摸1张牌。`, ...game.log],
   };
 }
@@ -2112,6 +2159,7 @@ function resolveFallChoice(game, ownerId, option) {
 
 function playCard(game, playerId, card) {
   const players = structuredClone(game.players);
+  const deck = game.deck ? [...game.deck] : null;
   const player = players[playerId];
   const enemyId = opponentOf(playerId);
   const enemy = players[enemyId];
@@ -2204,7 +2252,7 @@ function playCard(game, playerId, card) {
       message = `${player.label}使用《${used.name}》，本体+${used.value}血。`;
     }
     if (used.effect === 'drawCards') {
-      const drawn = drawCards(player, used.value);
+      const drawn = drawCards(player, used.value, deck, players);
       message = `${player.label}使用《${used.name}》，抽${drawn}张牌。`;
     }
     if (used.effect === 'reduceSelfPollution') {
@@ -2389,7 +2437,7 @@ function playCard(game, playerId, card) {
   }
 
   applyRewindIfDefeated(players, pollutionLogs);
-  return { ...game, players, log: [...pollutionLogs, message, ...game.log] };
+  return { ...game, players, ...(deck ? { deck } : {}), log: [...pollutionLogs, message, ...game.log] };
 }
 
 function playTargetedKill(game, playerId, card, target) {
@@ -4185,6 +4233,8 @@ function CardDetail({ card, onClose }) {
 
 function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
   const effectText = targetEffectSummary(card, actor);
+  const actorPhysicalDamage = actor ? (actor.actionDamage ?? actor.actionBodyDamage ?? actor.actionCharacterDamage ?? actor.atk ?? 0) : 0;
+  const pureSpiritAction = Boolean(actor?.actionSpiritDamage && actorPhysicalDamage <= 0 && !actor.actionEffect);
   return (
     <div className="detail-overlay" onClick={onCancel}>
       <article className="target-dialog" onClick={(event) => event.stopPropagation()}>
@@ -4215,13 +4265,13 @@ function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
               <span>自身+{actor.actionSelfPolluteForSkill}污染，+1技能点</span>
             </button>
           ) : null}
-          {actor?.actionSpiritDamage ? (
+          {actor?.actionSpiritDamage && !pureSpiritAction ? (
             <button className="target-option support-target" onClick={() => onSelect({ type: 'spiritEnemy' })}>
               <strong>削减精神</strong>
               <span>-{actor.actionSpiritDamage} 精神力</span>
             </button>
           ) : null}
-          <button className="target-option body-target" onClick={() => onSelect({ type: 'body' })}>
+          <button className="target-option body-target" onClick={() => onSelect(pureSpiritAction ? { type: 'spiritEnemy' } : { type: 'body' })}>
             <strong>{enemy.label} 本体</strong>
             <span>生命 {enemy.hp}</span>
           </button>
@@ -4229,13 +4279,13 @@ function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
             <React.Fragment key={character.instanceId}>
               <button
                 className="target-option"
-                onClick={() => onSelect({ type: 'character', instanceId: character.instanceId })}
+                onClick={() => onSelect(pureSpiritAction ? { type: 'characterSpirit', instanceId: character.instanceId } : { type: 'character', instanceId: character.instanceId })}
               >
                 <CardArt card={character} className="target-art" />
                 <strong>{character.name}</strong>
                 <span>{character.currentHp == null ? '特殊' : `${character.currentHp} 血`}</span>
               </button>
-              {actor?.actionSpiritDamage ? (
+              {actor?.actionSpiritDamage && !pureSpiritAction ? (
                 <button
                   className="target-option support-target"
                   onClick={() => onSelect({ type: 'characterSpirit', instanceId: character.instanceId })}
