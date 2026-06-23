@@ -206,6 +206,8 @@ const DEFAULT_SETTINGS = {
   uiScale: 100,
   fontScale: 100,
   handCardScale: 112,
+  handGap: 10,
+  handTextScale: 100,
   boardCardScale: 110,
   startScale: 100,
   gameOffsetX: 0,
@@ -308,6 +310,8 @@ function getStoredSettings() {
       uiScale: Math.min(300, Math.max(1, Number(parsed.uiScale) || DEFAULT_SETTINGS.uiScale)),
       fontScale: Math.min(200, Math.max(50, Number(parsed.fontScale) || DEFAULT_SETTINGS.fontScale)),
       handCardScale: Math.min(180, Math.max(70, Number(parsed.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
+      handGap: Math.min(80, Math.max(-40, Number(parsed.handGap) || DEFAULT_SETTINGS.handGap)),
+      handTextScale: Math.min(200, Math.max(50, Number(parsed.handTextScale) || DEFAULT_SETTINGS.handTextScale)),
       boardCardScale: Math.min(180, Math.max(70, Number(parsed.boardCardScale) || DEFAULT_SETTINGS.boardCardScale)),
       startScale: Math.min(160, Math.max(60, Number(parsed.startScale) || DEFAULT_SETTINGS.startScale)),
       gameOffsetX: Math.min(300, Math.max(-300, Number(parsed.gameOffsetX) || DEFAULT_SETTINGS.gameOffsetX)),
@@ -522,6 +526,11 @@ function visibleLogLine(line, game, viewerId) {
       if (end < 0) break;
       text = `${text.slice(0, start)}${player.label}的暗置牌${text.slice(end + 1)}`;
     }
+    player.hidden.forEach((card) => {
+      if (!card?.name) return;
+      text = text.split(`《${card.name}》`).join('《暗置牌》');
+      text = text.split(card.name).join('暗置牌');
+    });
   });
   return text;
 }
@@ -1062,7 +1071,7 @@ function nextPhase(game) {
     const nextPhaseName = order[index + 1];
     const nextPlayerId = nextPhaseName.split(':')[0];
     const rewindLogs = [];
-    if (nextPhaseName.endsWith(':action')) {
+    if (nextPhaseName === `${nextPlayerId}:play` && (phaseEndPlayers[nextPlayerId].rewindUntilTurn ?? Infinity) <= game.turn) {
       restoreRewindSnapshot(phaseEndPlayers[nextPlayerId], rewindLogs);
     }
     const actionState = nextPhaseName.endsWith(':action')
@@ -1080,10 +1089,13 @@ function nextPhase(game) {
 
   const players = phaseEndPlayers;
   const spiritLogs = [];
+  const rewindLogs = [];
+  Object.values(players).forEach((player) => {
+    if ((player.rewindUntilTurn ?? Infinity) <= game.turn + 1) restoreRewindSnapshot(player, rewindLogs);
+  });
   const roundEndLogs = runRoundEndEffects(players, game.turn);
   Object.values(players).forEach((player) => {
-    const hasCore = player.equipment.some((card) => card.id === 'e02');
-    addSkill(player, hasCore ? 3 : 2);
+    addSkill(player, 3);
     const woodTreeSkill = allBoardCharacters(player).filter((card) => card.id === 'hidden_wood_tree').length;
     if (woodTreeSkill > 0) addSkill(player, woodTreeSkill);
     if (hasEquipment(player, 'scene_great_invasion')) player.hp = clampHp(player.hp - 1);
@@ -1112,6 +1124,7 @@ function nextPhase(game) {
     actionState: null,
     log: [
       ...phaseEndLogs,
+      ...rewindLogs,
       ...roundEndLogs,
       ...carriageLogs,
       ...darknessLogs,
@@ -2720,6 +2733,7 @@ function App() {
   }
 
   function showPlayFx(card) {
+    if (isHiddenLike(card) || card?.id === 'char_protector') return;
     setPlayFx({ card, id: `${card.instanceId}-${Date.now()}` });
     window.setTimeout(() => setPlayFx(null), 720);
   }
@@ -3191,6 +3205,8 @@ function App() {
         '--ui-scale': settings.uiScale / 100,
         '--font-scale': (settings.fontScale ?? 100) / 100,
         '--hand-card-scale': (settings.handCardScale ?? DEFAULT_SETTINGS.handCardScale) / 100,
+        '--hand-gap': `${settings.handGap ?? DEFAULT_SETTINGS.handGap}px`,
+        '--hand-text-scale': (settings.handTextScale ?? DEFAULT_SETTINGS.handTextScale) / 100,
         '--board-card-scale': (settings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale) / 100,
         '--app-window-offset-x': `${settings.gameOffsetX ?? 0}px`,
         '--app-window-offset-y': `${settings.gameOffsetY ?? 0}px`,
@@ -3365,7 +3381,7 @@ function App() {
             </header>
             <p className="drawer-status">{statusText}</p>
             <div className="drawer-log">
-              {game.log.slice(0, 8).map((item, index) => (
+              {game.log.map((item, index) => (
                 <p key={`${item}-${index}`}>{visibleLogLine(item, game, selectedPlayer)}</p>
               ))}
             </div>
@@ -3465,6 +3481,8 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       uiScale: Math.min(300, Math.max(1, Number(draftSettings.uiScale) || 100)),
       fontScale: Math.min(200, Math.max(50, Number(draftSettings.fontScale) || 100)),
       handCardScale: Math.min(180, Math.max(70, Number(draftSettings.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
+      handGap: Math.min(80, Math.max(-40, Number(draftSettings.handGap) || DEFAULT_SETTINGS.handGap)),
+      handTextScale: Math.min(200, Math.max(50, Number(draftSettings.handTextScale) || DEFAULT_SETTINGS.handTextScale)),
       boardCardScale: Math.min(180, Math.max(70, Number(draftSettings.boardCardScale) || DEFAULT_SETTINGS.boardCardScale)),
       startScale: Math.min(160, Math.max(60, Number(draftSettings.startScale) || DEFAULT_SETTINGS.startScale)),
       gameOffsetX: Math.min(300, Math.max(-300, Number(draftSettings.gameOffsetX) || DEFAULT_SETTINGS.gameOffsetX)),
@@ -3704,6 +3722,24 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 max="180"
                 value={draftSettings.handCardScale ?? DEFAULT_SETTINGS.handCardScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handCardScale: event.target.value }))}
+              />
+              <label htmlFor="hand-gap">手牌间距 -40 到 80</label>
+              <input
+                id="hand-gap"
+                type="number"
+                min="-40"
+                max="80"
+                value={draftSettings.handGap ?? DEFAULT_SETTINGS.handGap}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, handGap: event.target.value }))}
+              />
+              <label htmlFor="hand-text-scale">手牌文字大小 50-200%</label>
+              <input
+                id="hand-text-scale"
+                type="number"
+                min="50"
+                max="200"
+                value={draftSettings.handTextScale ?? DEFAULT_SETTINGS.handTextScale}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, handTextScale: event.target.value }))}
               />
               <label htmlFor="board-card-scale">场上卡牌大小 70-180%</label>
               <input

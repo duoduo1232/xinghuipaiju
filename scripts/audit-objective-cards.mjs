@@ -78,7 +78,7 @@ const expected = [
   ['skill_wordless_book', { type: 'skill', cost: 1, valueText: '+10', effect: 'wordlessBook' }],
   ['scene_darkness', { type: 'scene', cost: 1, valueText: '+20', effect: 'darknessScene' }],
   ['skill_medicine', { type: 'skill', cost: 1, valueText: '+25', effect: 'restoreSpirit' }],
-  ['char_it', { type: 'character', cost: 3, valueText: '+40', hp: null, spirit: 5, effect: 'itEnter' }],
+  ['char_it', { type: 'character', cost: 3, valueText: '+40', hp: null, spirit: 3, effect: 'itEnter' }],
   ['char_orca', { type: 'character', cost: 0, valueText: '+20', hp: 10, effect: 'orcaEnter' }],
   ['skill_sleeping_pills', { type: 'skill', cost: 2, valueText: '+10', effect: 'removeEnemyHidden' }],
   ['skill_bangbang', { type: 'skill', cost: 1, valueText: '+70', effect: 'trueBodyStrike' }],

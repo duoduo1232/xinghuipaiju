@@ -1268,7 +1268,7 @@ button:not(:disabled) {
 
 .hand-tray {
   position: relative;
-  z-index: 10000;
+  z-index: 12000;
   display: block;
   overflow: visible;
   padding: 10px 24px 14px;
@@ -1295,12 +1295,12 @@ button:not(:disabled) {
 
 .hand-scroll {
   position: relative;
-  z-index: 14000;
+  z-index: 12010;
   width: 100%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 10px;
+  gap: var(--hand-gap, 10px);
   overflow: visible;
   padding: 2px 42px 8px;
 }
@@ -1311,11 +1311,11 @@ button:not(:disabled) {
 
 .hand-card-wrap {
   position: relative;
-  z-index: 14001;
+  z-index: 12011;
   flex: 0 0 calc(136px * var(--hand-card-scale, 1));
   display: grid;
   justify-items: center;
-  margin-left: -12px;
+  margin-left: 0;
   transform-origin: bottom center;
   transform: scale(var(--hand-card-scale, 1));
   transition: transform 120ms ease, filter 120ms ease;
@@ -1326,34 +1326,34 @@ button:not(:disabled) {
 }
 
 .hand-card-wrap:hover {
-  z-index: 14002;
+  z-index: 12012;
   transform: translateY(-16px) scale(calc(var(--hand-card-scale, 1) * 1.08));
 }
 
 .hand-card-wrap.selected {
-  z-index: 14003;
+  z-index: 12013;
   transform: translateY(-26px) scale(calc(var(--hand-card-scale, 1) * 1.16));
 }
 
 .hand-card-wrap.selected .card-mini {
   position: relative;
-  z-index: 14004;
+  z-index: 12014;
   filter: saturate(1.08) brightness(1.04);
   box-shadow: 0 0 0 3px rgba(87, 157, 220, 0.72), 0 14px 24px rgba(42, 66, 103, 0.28);
 }
 
 .hand-card-wrap.selected .inspect-card {
-  z-index: 14005;
+  z-index: 12015;
   transform: scale(1.05);
 }
 
 .hand-card-wrap .card-mini {
   position: relative;
-  z-index: 14004;
+  z-index: 12014;
 }
 
 .hand-card-wrap .inspect-card {
-  z-index: 14005;
+  z-index: 12015;
 }
 
 .hand-card-wrap.disabled .card-mini {
@@ -1531,7 +1531,7 @@ button:not(:disabled) {
   height: 35px;
   overflow: hidden;
   color: #efd9a5;
-  font-size: 8px;
+  font-size: calc(8px * var(--hand-text-scale, 1));
   line-height: 1.15;
   margin: 0;
   text-shadow: 0 1px 0 #000;
@@ -1821,19 +1821,19 @@ button:not(:disabled) {
 
 .damage-hit-burst {
   position: absolute;
-  top: 45%;
-  z-index: 18;
-  width: 128px;
-  height: 110px;
+  top: 24%;
+  z-index: 18000;
+  width: 168px;
+  height: 138px;
   pointer-events: none;
 }
 
 .damage-hit-burst.left {
-  left: 18%;
+  left: 12%;
 }
 
 .damage-hit-burst.right {
-  right: 18%;
+  right: 12%;
 }
 
 .damage-hit-burst strong {
@@ -1842,7 +1842,7 @@ button:not(:disabled) {
   top: 34%;
   z-index: 2;
   color: #ff355f;
-  font-size: 26px;
+  font-size: 38px;
   font-weight: 1000;
   text-shadow: 0 2px 0 #fff, 0 5px 12px rgba(146, 24, 48, 0.35);
   transform: translate(-50%, -50%);
@@ -1853,8 +1853,8 @@ button:not(:disabled) {
   position: absolute;
   left: 50%;
   top: 48%;
-  width: 9px;
-  height: 20px;
+  width: 13px;
+  height: 28px;
   border-radius: 4px;
   background: linear-gradient(180deg, #ff6982, #b61331);
   box-shadow: 0 0 0 2px rgba(255, 235, 238, 0.55);
@@ -1969,6 +1969,7 @@ button:not(:disabled) {
 
 .drawer-content {
   height: 100%;
+  min-height: 0;
   margin-left: 34px;
   display: grid;
   grid-template-rows: auto auto 1fr;
@@ -2020,6 +2021,7 @@ button:not(:disabled) {
 }
 
 .drawer-log {
+  min-height: 0;
   overflow-y: auto;
   display: grid;
   align-content: start;
@@ -2038,7 +2040,7 @@ button:not(:disabled) {
 .coin-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50000;
+  z-index: 60000;
   display: grid;
   place-items: center;
   padding: 18px;
@@ -2559,7 +2561,7 @@ button:not(:disabled) {
 
   .hand-card-wrap {
     flex-basis: 108px;
-    margin-left: -12px;
+    margin-left: 0;
   }
 
   .card-mini {
@@ -2660,7 +2662,7 @@ button:not(:disabled) {
   }
 
   .frame-text {
-    font-size: 8px;
+    font-size: calc(8px * var(--hand-text-scale, 1));
   }
 
   .inspect-card {
@@ -2921,7 +2923,7 @@ button:not(:disabled) {
 
   .hand-card-wrap {
     flex-basis: 80px;
-    margin-left: -10px;
+    margin-left: 0;
   }
 
   .hand-card-wrap:first-child {
@@ -2978,7 +2980,7 @@ button:not(:disabled) {
     right: 8px;
     top: 77px;
     height: 19px;
-    font-size: 6px;
+    font-size: calc(6px * var(--hand-text-scale, 1));
   }
 
   .frame-type {
@@ -3262,7 +3264,7 @@ button:not(:disabled) {
 
   .hand-card-wrap {
     flex-basis: 90px;
-    margin-left: -10px;
+    margin-left: 0;
   }
 
   .hand-card-wrap:first-child {
@@ -3319,7 +3321,7 @@ button:not(:disabled) {
     right: 10px;
     top: 87px;
     height: 22px;
-    font-size: 6px;
+    font-size: calc(6px * var(--hand-text-scale, 1));
   }
 
   .frame-type {
@@ -3716,13 +3718,13 @@ button:not(:disabled) {
   }
 
   .hand-scroll {
-    gap: 6px;
+    gap: var(--hand-gap, 6px);
     padding: 0 82px 0 112px;
   }
 
   .hand-card-wrap {
     flex-basis: 70px;
-    margin-left: -8px;
+    margin-left: 0;
     transform: translateY(-14px) scale(var(--hand-card-scale, 1));
   }
 
@@ -3762,7 +3764,7 @@ button:not(:disabled) {
     right: 7px;
     top: 68px;
     height: 17px;
-    font-size: 5.5px;
+    font-size: calc(5.5px * var(--hand-text-scale, 1));
   }
 
   .frame-type {

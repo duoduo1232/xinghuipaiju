@@ -587,7 +587,7 @@ export const STARTING_DECK = [
     cost: 3,
     valueText: '+40',
     hp: null,
-    spirit: 5,
+    spirit: 3,
     atk: 0,
     actionCount: 1,
     actionSelfSpiritCost: 1,
