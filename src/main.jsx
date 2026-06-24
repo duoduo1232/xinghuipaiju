@@ -46,6 +46,8 @@ const AI_PASS_SCORE_FLOOR = -80;
 const APP_VERSION = packageInfo.version ?? '0.0.0';
 const DEFAULT_UPDATE_REPO = APP_CONFIG.updateRepo;
 const DEFAULT_UPDATE_PROXY = APP_CONFIG.updateProxy;
+const DEFAULT_LEADERBOARD_URL = APP_CONFIG.leaderboardUrl;
+const DEFAULT_RELAY_URL = APP_CONFIG.defaultRelayUrl ?? 'ws://duoduo1215.xyz:18781';
 const NativeUpdater = registerPlugin('NativeUpdater');
 
 function getCardArtUrl(card) {
@@ -118,8 +120,7 @@ function parsePollutionDelta(valueText) {
 function isCharacterLike(card) {
   return card.type === 'character'
     || card.subType === 'character'
-    || card.subType === '角色'
-    || card.subType === '瑙掕壊';
+    || card.subType === '角色';
 }
 
 function isHiddenLike(card) {
@@ -128,7 +129,7 @@ function isHiddenLike(card) {
 
 function boardZoneOf(card) {
   if (isCharacterLike(card)) return 'characters';
-  if (card.type === 'equipment' || card.subType === 'equipment' || card.subType === '装备' || card.subType === '瑁呭') return 'equipment';
+  if (card.type === 'equipment' || card.subType === 'equipment' || card.subType === '装备') return 'equipment';
   if (card.type === 'scene' || card.subType === 'scene' || card.subType === '场景') return 'scenes';
   return null;
 }
@@ -171,7 +172,7 @@ function createPlayer(id, label) {
     label,
     maxHp: PLAYER_BASE_HP,
     hp: PLAYER_BASE_HP,
-    skill: 2,
+    skill: 3,
     maxSpirit: PLAYER_BASE_SPIRIT,
     spirit: PLAYER_BASE_SPIRIT,
     pollution: 0,
@@ -195,7 +196,7 @@ function addSkill(player, amount) {
   player.skill = Math.min(MAX_SKILL, Math.max(0, (player.skill ?? 0) + amount));
 }
 
-const DEFAULT_PLAYER_NAME = '玩家';
+const DEFAULT_PLAYER_NAME = '鐜╁';
 const PLAYER_NAME_KEY = 'pixel-card-player-name';
 const PLAYER_STATS_KEY = 'pixel-card-player-stats';
 const PLAYER_SETTINGS_KEY = 'pixel-card-settings';
@@ -254,16 +255,14 @@ const CUSTOM_CARD_SKILL_FIELDS = [
   '基础：代码必须是一段 JSON，例如 {"effect":"healSelf","value":15,"cost":1,"valueText":"+0","text":"我方本体+15血。"}',
   'type：character / equipment / scene / skill / hidden / food。不写时使用表单里选的类型。',
   'cost：消耗技能点，数字；技能点上限是 5。',
-  'valueText：污染变化，写普通数字字符串，例如 "+10" 或 "-5"；只写数字默认就是污染。',
+  'valueText：污染变化，例如 "+10" 或 "-5"。',
   'effect：推荐使用已有规则效果，乱写新名字只会当说明牌，不会自动产生新规则。',
   '常用 effect：healSelf 治疗本体，drawCards 抽牌，damageEnemy 伤害敌方本体，reduceSelfPollution 降低自身污染，restoreSpirit 恢复精神力。',
-  '目标类 effect：killTarget 40点物伤，shieldCard 选择己方角色+1护盾，removeEnemyHidden 移除暗置，destroyEnemyScene 摧毁场景，memorySceneRemove 移除场景并追加精神/污染效果。',
-  '特殊 effect：teleport 传送，wordlessBook 无字天书，feedingContract 投喂契约，rewindClock 回溯之钟，selfDestruct 自毁装置，inspectHidden / inspectAllHidden 查看暗置。',
-  'value：效果数值，例如治疗量、抽牌数、伤害量；不同 effect 会用不同含义。',
+  '目标类 effect：killTarget 40点物伤，shieldCard 选择己方角色+1护盾，removeEnemyHidden 移除暗置，destroyEnemyScene 摧毁场景。',
+  '特殊 effect：teleport 传送，wordlessBook 无字天书，feedingContract 投喂契约，rewindClock 回溯之钟，selfDestruct 自毁装置。',
   '角色字段：hp 血量，spirit 精神力，atk 展示攻击，noSpirit true 表示没有精神力。',
-  '行动字段：actionCount 行动次数，actionDamage 物伤，actionBodyDamage 本体伤害，actionCharacterDamage 角色伤害，actionShield 自身护盾，actionSkillCost 行动消耗技能点。',
-  '额外行动字段：actionPolluteEnemy 增加敌方污染，actionSelfPolluteForSkill 自身加污染并获得 1 技能点，untargetableByAttack 普通攻击不可选中。',
-  '暗置：type 写 hidden，subType 写 character / equipment / scene / skill；暗置会占对应槽位，只是对方看不到。',
+  '行动字段：actionCount 行动次数，actionDamage 物伤，actionShield 自身护盾，actionSkillCost 行动消耗技能点。',
+  '暗置：type 写 hidden，subType 写 character / equipment / scene / skill，会占对应槽位。',
   '标记：gear true 或 tags 包含 "齿轮" 会被传送等齿轮相关效果识别。',
   'text：卡牌说明文字，会显示在卡牌和详情页。',
 ];
@@ -282,7 +281,6 @@ const CUSTOM_CARD_CODE_EXAMPLES = [
     code: '{"type":"hidden","subType":"character","hp":10,"spirit":10,"actionCount":1,"actionDamage":5,"cost":1,"valueText":"+10","text":"暗置角色。可行动1次，造成5点物伤。"}',
   },
 ];
-
 function getStoredStats() {
   if (typeof window === 'undefined') return { wins: 0, losses: 0 };
   try {
@@ -298,6 +296,23 @@ function getStoredStats() {
 
 function saveStats(stats) {
   window.localStorage.setItem(PLAYER_STATS_KEY, JSON.stringify(stats));
+}
+
+async function fetchLeaderboard(signal) {
+  if (!DEFAULT_LEADERBOARD_URL) return [];
+  const response = await fetch(DEFAULT_LEADERBOARD_URL, { signal });
+  if (!response.ok) throw new Error(`鎺掕姒滆鍙栧け璐ワ細${response.status}`);
+  const data = await response.json();
+  return Array.isArray(data.players) ? data.players : [];
+}
+
+async function submitLeaderboardResult({ name, result, mode }) {
+  if (!DEFAULT_LEADERBOARD_URL || !name || !result) return;
+  await fetch(DEFAULT_LEADERBOARD_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, result, mode }),
+  });
 }
 
 function getStoredSettings() {
@@ -362,7 +377,7 @@ function normalizeUpdateProxy(proxy = '') {
 function normalizeLanUrl(input = '') {
   const trimmed = String(input).trim();
   if (!trimmed) {
-    throw new Error('请填写联机服务器地址，例如 192.168.1.5:8781 或 example.com:8781');
+    throw new Error('请填写联机服务器地址，例如 ws://duoduo1215.xyz:18781。');
   }
 
   let candidate = trimmed;
@@ -370,7 +385,7 @@ function normalizeLanUrl(input = '') {
   const securePage = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const explicitPlainWs = /^ws:\/\//i.test(candidate) || /^http:\/\//i.test(candidate);
   if (securePage && explicitPlainWs) {
-    throw new Error('HTTPS 网页不能连接 ws://。请用 APK、HTTP 页面，或把联机服务器配置成真正的 wss://。');
+    throw new Error('HTTPS 页面不能连接 ws://。请使用 wss://，或在 APK/HTTP 页面里连接 ws://。');
   }
   if (/^https?:\/\//i.test(candidate)) {
     candidate = candidate.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
@@ -381,9 +396,22 @@ function normalizeLanUrl(input = '') {
   const url = new URL(candidate);
   if (url.protocol !== 'ws:' && url.protocol !== 'wss:') url.protocol = 'ws:';
   if (!hasProtocol && !url.port) {
-    url.port = '8781';
+    url.port = '18781';
   }
   return url;
+}
+
+function roomApiUrlFromWs(input = '') {
+  const wsUrl = normalizeLanUrl(input);
+  wsUrl.protocol = wsUrl.protocol === 'wss:' ? 'https:' : 'http:';
+  wsUrl.pathname = '/rooms';
+  wsUrl.search = '';
+  return wsUrl.toString();
+}
+
+function makeRoomId(name = '') {
+  const prefix = String(name || 'room').trim().replace(/[^\w\u4e00-\u9fa5-]/g, '').slice(0, 8) || 'room';
+  return `${prefix}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 function proxyGitHubDownloadUrl(url, proxy = DEFAULT_UPDATE_PROXY) {
@@ -399,14 +427,14 @@ function proxyGitHubDownloadUrl(url, proxy = DEFAULT_UPDATE_PROXY) {
 async function checkGitHubUpdate(repo, signal) {
   const normalizedRepo = normalizeGitHubRepo(repo);
   if (!/^[\w.-]+\/[\w.-]+$/.test(normalizedRepo)) {
-    throw new Error('请先填写 GitHub 仓库，例如 username/pixel-card-duel');
+    throw new Error('请先填写 GitHub 仓库，例如 username/pixel-card-duel。');
   }
   const response = await fetch(`https://api.github.com/repos/${normalizedRepo}/releases/latest`, {
     headers: { Accept: 'application/vnd.github+json' },
     signal,
   });
   if (response.status === 404) {
-    throw new Error('没有找到 Release，先在 GitHub 发布一个版本');
+    throw new Error('没有找到 Release，请先在 GitHub 发布一个版本。');
   }
   if (!response.ok) {
     throw new Error(`检查失败：GitHub 返回 ${response.status}`);
@@ -432,7 +460,7 @@ function getStoredPlayerName() {
 function getAutoStartMode() {
   if (typeof window === 'undefined') return null;
   const mode = new URLSearchParams(window.location.search).get('autostart');
-  return ['pve', 'pvp', 'p2p', 'lan'].includes(mode) ? mode : null;
+  return ['pve', 'pvp', 'p2p', 'lan', 'relay', 'ffa4', 'team4'].includes(mode) ? mode : null;
 }
 
 function looksLikeAudioUrl(value) {
@@ -460,24 +488,32 @@ async function resolveMusicSource(input, signal) {
 function getSeatLabels(mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 'p1') {
   const name = localName?.trim() || DEFAULT_PLAYER_NAME;
   if (mode === 'pve') return { p1: name, p2: 'Bot' };
-  if (mode === 'p2p' || mode === 'lan') {
+  if (mode === 'p2p' || mode === 'lan' || mode === 'relay') {
     return {
       p1: localSeat === 'p1' ? name : DEFAULT_PLAYER_NAME,
       p2: localSeat === 'p2' ? name : DEFAULT_PLAYER_NAME,
     };
   }
-  return { p1: name, p2: '对手' };
+  if (mode === 'ffa4' || mode === 'team4') {
+    return {
+      p1: name,
+      p2: 'Bot',
+      p3: mode === 'team4' ? 'AI 闃熷弸' : 'Bot',
+      p4: 'Bot',
+    };
+  }
+  return { p1: name, p2: '瀵规墜' };
 }
 
 function setupGame({ mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 'p1', customCards = [] } = {}) {
-  const first = Math.random() < 0.5 ? 'p1' : 'p2';
+  const baseTurnOrder = mode === 'ffa4' || mode === 'team4' ? ['p1', 'p2', 'p3', 'p4'] : ['p1', 'p2'];
+  const first = baseTurnOrder[Math.floor(Math.random() * baseTurnOrder.length)];
+  const startIndex = baseTurnOrder.indexOf(first);
+  const turnOrder = [...baseTurnOrder.slice(startIndex), ...baseTurnOrder.slice(0, startIndex)];
   const labels = getSeatLabels(mode, localName, localSeat);
   const deck = shuffle(makeDeck('shared', customCards));
-  const players = {
-    p1: createPlayer('p1', labels.p1),
-    p2: createPlayer('p2', labels.p2),
-  };
-  const dealOrder = [first, opponentOf(first)];
+  const players = Object.fromEntries(baseTurnOrder.map((playerId) => [playerId, createPlayer(playerId, labels[playerId] ?? DEFAULT_PLAYER_NAME)]));
+  const dealOrder = turnOrder;
   for (let index = 0; index < STARTING_HAND_SIZE; index += 1) {
     dealOrder.forEach((playerId) => {
       if (deck.length > 0) players[playerId].hand.push(deck.shift());
@@ -487,10 +523,12 @@ function setupGame({ mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 
     matchId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     players,
     deck,
+    turnOrder,
+    mode,
     first,
     turn: 1,
     phase: `${first}:play`,
-    log: [`双方获得2点初始技能点。`, `抛硬币决定：${labels[first]}成为先手。`],
+    log: [`双方获得3点初始技能点。`, `抛硬币决定：${labels[first]}成为先手。`],
     inspected: null,
     actionState: null,
     revealedHidden: null,
@@ -499,6 +537,82 @@ function setupGame({ mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 
 
 function opponentOf(playerId) {
   return playerId === 'p1' ? 'p2' : 'p1';
+}
+
+function isFourPlayerMode(mode) {
+  return mode === 'ffa4' || mode === 'team4';
+}
+
+function isRelayNetworkMode(mode) {
+  return mode === 'p2p' || mode === 'lan' || mode === 'relay';
+}
+
+function getTurnOrder(game) {
+  return game.turnOrder?.length ? game.turnOrder : ['p1', 'p2'];
+}
+
+function getTeamId(playerId) {
+  if (playerId === 'p1' || playerId === 'p3') return 'a';
+  if (playerId === 'p2' || playerId === 'p4') return 'b';
+  return null;
+}
+
+function getEnemyIds(game, playerId) {
+  const ids = getTurnOrder(game).filter((id) => id !== playerId);
+  if (!isFourPlayerMode(game.mode)) return [opponentOf(playerId)];
+  if (game.mode === 'team4') {
+    const team = getTeamId(playerId);
+    return ids.filter((id) => getTeamId(id) !== team);
+  }
+  return ids;
+}
+
+function getPrimaryEnemyId(game, playerId) {
+  const enemyIds = getEnemyIds(game, playerId);
+  if (enemyIds.length === 0) return opponentOf(playerId);
+  const order = getTurnOrder(game);
+  const start = order.indexOf(playerId);
+  if (start >= 0) {
+    for (let offset = 1; offset <= order.length; offset += 1) {
+      const candidate = order[(start + offset) % order.length];
+      if (enemyIds.includes(candidate)) return candidate;
+    }
+  }
+  return enemyIds[0];
+}
+
+function modeLabel(mode) {
+  if (mode === 'pve') return '人机对战';
+  if (mode === 'p2p') return 'P2P 联机';
+  if (mode === 'lan') return '局域网联机';
+  if (mode === 'relay') return '服务器联机';
+  if (mode === 'ffa4') return '4人自由战';
+  if (mode === 'team4') return '4人组队战';
+  return '双人对战';
+}
+
+function isAiControlledSeat(mode, playerId, localSeat = 'p1') {
+  if (mode === 'pve') return playerId === 'p2';
+  if (mode === 'ffa4' || mode === 'team4') return playerId !== localSeat;
+  return false;
+}
+
+function getWinner(game, localSeat = 'p1') {
+  const aliveIds = getTurnOrder(game).filter((id) => (game.players[id]?.hp ?? 0) > 0);
+  if (aliveIds.length === 0) return null;
+  if (!isFourPlayerMode(game.mode)) {
+    const defeated = getTurnOrder(game).find((id) => (game.players[id]?.hp ?? 0) <= 0);
+    return defeated ? game.players[opponentOf(defeated)] : null;
+  }
+  if (game.mode === 'team4') {
+    const aliveTeams = new Set(aliveIds.map(getTeamId));
+    if (aliveTeams.size === 1) {
+      const winnerId = aliveIds.includes(localSeat) ? localSeat : aliveIds[0];
+      return game.players[winnerId];
+    }
+    return null;
+  }
+  return aliveIds.length === 1 ? game.players[aliveIds[0]] : null;
 }
 
 function isNetChannelOpen(channel) {
@@ -519,13 +633,6 @@ function visibleLogLine(line, game, viewerId) {
   let text = String(line ?? '');
   Object.values(game.players).forEach((player) => {
     if (player.id === viewerId) return;
-    const marker = `${player.label}的暗置《`;
-    while (text.includes(marker)) {
-      const start = text.indexOf(marker);
-      const end = text.indexOf('》', start + marker.length);
-      if (end < 0) break;
-      text = `${text.slice(0, start)}${player.label}的暗置牌${text.slice(end + 1)}`;
-    }
     player.hidden.forEach((card) => {
       if (!card?.name) return;
       text = text.split(`《${card.name}》`).join('《暗置牌》');
@@ -534,25 +641,34 @@ function visibleLogLine(line, game, viewerId) {
   });
   return text;
 }
-
-function canPlayCard(game, playerId, card) {
+function getCannotPlayReason(game, playerId, card) {
   const player = game.players[playerId];
-  if (player.cannotPlayThisRound) return false;
+  if (!player) return '找不到当前玩家。';
+  if (!card) return '没有选中卡牌。';
+  if (player.cannotPlayThisRound) return '本回合被效果限制，不能出牌。';
   const freeByRefrigeration = card.type === 'skill' && hasEquipment(player, 'scene_refrigeration') && !player.freeSkillUsed;
   const freeByConsole = hasEquipment(player, 'scene_control_console') && !player.freeCardUsed;
   const freePlay = freeByConsole || freeByRefrigeration;
 
-  if (!freePlay && player.skill < card.cost) return false;
+  if (!freePlay && player.skill < card.cost) return `技能点不足：需要 ${card.cost}，当前 ${player.skill}。`;
   const playedHidden = isHiddenLike(card) || card.id === 'char_protector';
   const zone = boardZoneOf(card);
-  if (playedHidden && player.hidden.length >= 2) return false;
-  if (zone && visibleAndHiddenZoneCount(player, zone) >= boardZoneLimit(zone)) return false;
-  if (card.effect === 'selfDestruct' && totalPollutionBursts(game.players) < SELF_DESTRUCT_BURSTS) return false;
+  if (playedHidden && player.hidden.length >= 2) return '暗置栏已满，最多 2 张。';
+  if (zone && visibleAndHiddenZoneCount(player, zone) >= boardZoneLimit(zone)) {
+    const names = { characters: '角色', equipment: '装备', scenes: '场景' };
+    return `${names[zone] ?? '场上'}栏已满，最多 ${boardZoneLimit(zone)} 张。`;
+  }
+  if (card.effect === 'selfDestruct' && totalPollutionBursts(game.players) < SELF_DESTRUCT_BURSTS) {
+    return `污染爆发次数不足：需要 ${SELF_DESTRUCT_BURSTS} 次。`;
+  }
   if (card.effect === 'feedingContract') {
     const hasTarget = allBoardCharacters(player).some((character) => !isGearCard(character));
-    if (!hasTarget) return false;
+    if (!hasTarget) return '没有可献祭的非齿轮角色。';
   }
-  return true;
+  return '';
+}
+function canPlayCard(game, playerId, card) {
+  return !getCannotPlayReason(game, playerId, card);
 }
 
 function scoreAiCard(game, playerId, card) {
@@ -648,7 +764,7 @@ function totalHealthForFx(player) {
 
 function selectableCardsForEffect(game, playerId, card) {
   const player = game.players[playerId];
-  const enemy = game.players[opponentOf(playerId)];
+  const enemy = game.players[getPrimaryEnemyId(game, playerId)];
   if (card.effect === 'removeEnemyHidden') return enemy.hidden;
   if (card.effect === 'destroyEnemyScene') return enemy.scenes ?? [];
   if (card.effect === 'memorySceneRemove') {
@@ -670,7 +786,7 @@ function selectableCardsForEffect(game, playerId, card) {
 
 function evaluateAiState(game, playerId) {
   const player = game.players[playerId];
-  const enemy = game.players[opponentOf(playerId)];
+  const enemy = game.players[getPrimaryEnemyId(game, playerId)];
   if (!player || !enemy) return -999999;
   if (enemy.hp <= 0) return 999999;
   if (player.hp <= 0) return -999999;
@@ -716,11 +832,13 @@ function evaluateAiState(game, playerId) {
 }
 
 function getKillTargets(game, playerId) {
-  const enemy = game.players[opponentOf(playerId)];
-  return [
-    { type: 'body' },
-    ...enemy.characters.map((card) => ({ type: 'character', instanceId: card.instanceId })),
-  ];
+  return getEnemyIds(game, playerId).flatMap((enemyId) => {
+    const enemy = game.players[enemyId];
+    return [
+      { type: 'body', enemyId },
+      ...enemy.characters.map((card) => ({ type: 'character', enemyId, instanceId: card.instanceId })),
+    ];
+  });
 }
 
 function getAiCardPlan(game, playerId, card) {
@@ -746,9 +864,9 @@ function getAiCardPlan(game, playerId, card) {
   let bonus = contextBonus;
   if (card.effect === 'healSelf' && game.players[playerId].hp >= (game.players[playerId].maxHp ?? PLAYER_BASE_HP)) bonus -= 30;
   if (card.effect === 'selfDestruct' && totalPollutionBursts(game.players) < SELF_DESTRUCT_BURSTS) bonus -= 85;
-  if (card.effect === 'motherLove' && game.players[opponentOf(playerId)].hand.length > 3) bonus -= 45;
-  if (card.effect === 'inspectHidden' && game.players[opponentOf(playerId)].hidden.length === 0) bonus -= 30;
-  if (card.effect === 'inspectAllHidden' && game.players[opponentOf(playerId)].hidden.length === 0) bonus -= 25;
+  if (card.effect === 'motherLove' && getEnemyIds(game, playerId).every((enemyId) => game.players[enemyId].hand.length > 3)) bonus -= 45;
+  if (card.effect === 'inspectHidden' && getEnemyIds(game, playerId).every((enemyId) => game.players[enemyId].hidden.length === 0)) bonus -= 30;
+  if (card.effect === 'inspectAllHidden' && getEnemyIds(game, playerId).every((enemyId) => game.players[enemyId].hidden.length === 0)) bonus -= 25;
   if (card.id === 'skill_ancestral_blessing' && game.players[playerId].pollution < 45) bonus -= 20;
 
   return {
@@ -802,14 +920,14 @@ function getAiCardPlans(game, playerId, card) {
     return getKillTargets(game, playerId)
       .map((target) => {
         const nextGame = playTargetedKill(game, playerId, card, target);
-        const enemy = game.players[opponentOf(playerId)];
+        const enemy = game.players[target.enemyId ?? getPrimaryEnemyId(game, playerId)];
         const targetCard = target.type === 'character'
           ? enemy.characters.find((item) => item.instanceId === target.instanceId)
           : null;
         const highestEnemyThreat = enemy.characters.reduce((best, item) => Math.max(best, aiCharacterThreat(item)), 0);
         const targetBonus = target.type === 'body'
-          ? (enemy.hp <= 40 ? 900 : (enemy.hp <= 65 ? 120 : -highestEnemyThreat * 1.2))
-          : aiCharacterThreat(targetCard) * 1.6;
+          ? (enemy.hp <= 40 ? 1400 : (enemy.hp <= 55 ? 420 : 90 - highestEnemyThreat * 0.25))
+          : aiCharacterThreat(targetCard) * 1.55 - (enemy.hp <= 55 ? 160 : 0);
         return {
           card,
           target,
@@ -876,7 +994,7 @@ function chooseKillTarget(game, playerId) {
 
 function chooseActionTarget(game, playerId, actor) {
   const player = game.players[playerId];
-  const enemy = game.players[opponentOf(playerId)];
+  const enemy = game.players[getPrimaryEnemyId(game, playerId)];
   const canPay = !actor.actionSkillCost || player.skill >= actor.actionSkillCost;
 
   if (!canPay) {
@@ -1025,7 +1143,7 @@ function runAiStep(game, playerId, { allowCycle = true } = {}) {
     const target = chooseActionTarget(game, playerId, actor);
     if (!target) {
       return {
-        game: advanceActionCursor(game, `${game.players[playerId].label}跳过了《${actor.name}》的行动。`),
+        game: advanceActionCursor(game, `${game.players[playerId].label}璺宠繃浜嗐€?{actor.name}銆嬬殑琛屽姩銆俙`),
         playedCard: null,
         advanced: false,
         cycled: false,
@@ -1034,7 +1152,7 @@ function runAiStep(game, playerId, { allowCycle = true } = {}) {
     const nextState = resolveCharacterAction(game, playerId, actor.instanceId, target);
     if (nextState === game) {
       return {
-        game: advanceActionCursor(game, `${game.players[playerId].label}无法完成《${actor.name}》的行动。`),
+        game: advanceActionCursor(game, `${game.players[playerId].label}鏃犳硶瀹屾垚銆?{actor.name}銆嬬殑琛屽姩銆俙`),
         playedCard: null,
         advanced: false,
         cycled: false,
@@ -1050,20 +1168,22 @@ function phaseLabel(game) {
   const [playerId, step] = game.phase.split(':');
   const name = game.players[playerId].label;
   const stepName = {
-    play: '出牌',
-    action: '角色行动',
+    play: '鍑虹墝',
+    action: '瑙掕壊琛屽姩',
   }[step];
-  return `${name} · ${stepName}`;
+  return `${name} 路 ${stepName}`;
 }
 
 function nextPhase(game) {
-  const second = opponentOf(game.first);
-  const order = [
-    `${game.first}:play`,
-    `${second}:play`,
-    `${second}:action`,
-    `${game.first}:action`,
-  ];
+  const turnOrder = getTurnOrder(game);
+  const order = isFourPlayerMode(game.mode)
+    ? turnOrder.flatMap((playerId) => [`${playerId}:play`, `${playerId}:action`])
+    : [
+        `${game.first}:play`,
+        `${opponentOf(game.first)}:play`,
+        `${opponentOf(game.first)}:action`,
+        `${game.first}:action`,
+      ];
   const index = order.indexOf(game.phase);
   const phaseEndPlayers = structuredClone(game.players);
   const phaseEndLogs = runSmallPhaseEndHiddenTriggers(phaseEndPlayers);
@@ -1119,7 +1239,8 @@ function nextPhase(game) {
     players,
     ...(deck ? { deck } : {}),
     turn: game.turn + 1,
-    phase: `${game.first}:play`,
+    phase: isFourPlayerMode(game.mode) ? `${turnOrder[0]}:play` : `${game.first}:play`,
+    first: isFourPlayerMode(game.mode) ? turnOrder[0] : game.first,
     inspected: null,
     actionState: null,
     log: [
@@ -1131,8 +1252,8 @@ function nextPhase(game) {
       ...roundStartLogs,
       ...spiritLogs,
       ...refillLogs,
-      `第 ${game.turn} 回合结束，双方手牌调整到5张。`,
-      `第 ${game.turn + 1} 回合开始，双方获得技能点。`,
+      `第${game.turn}回合结束，双方手牌调整到5张。`,
+      `第${game.turn + 1}回合开始，双方获得3点技能点。`,
       ...game.log,
     ],
   };
@@ -1169,10 +1290,10 @@ function drawRoundCards(players, sharedDeck = null) {
       const drawLimit = Math.max(0, Math.min(TURN_DRAW_COUNT, HAND_LIMIT - player.hand.length));
       const recycled = sharedDeck.length === 0 ? recycleSharedDeck(sharedDeck, players) : 0;
       const drawn = drawFromSharedDeck(player, TURN_DRAW_COUNT, sharedDeck, players);
-      if (recycled > 0) logs.push(`公共牌库摸空，将${recycled}张弃牌洗回牌库。`);
-      if (drawn > 0) logs.push(`${player.label}补摸${drawn}张牌。`);
-      if (drawLimit === 0) logs.push(`${player.label}手牌已满，不能继续摸牌。`);
-      if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}没有摸到牌。`);
+      if (recycled > 0) logs.push(`鍏叡鐗屽簱鎽哥┖锛屽皢${recycled}寮犲純鐗屾礂鍥炵墝搴撱€俙`);
+      if (drawn > 0) logs.push(`${player.label}琛ユ懜${drawn}寮犵墝銆俙`);
+      if (drawLimit === 0) logs.push(`${player.label}鎵嬬墝宸叉弧锛屼笉鑳界户缁懜鐗屻€俙`);
+      if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}娌℃湁鎽稿埌鐗屻€俙`);
       return;
     }
     let drawn = 0;
@@ -1189,10 +1310,10 @@ function drawRoundCards(players, sharedDeck = null) {
       player.hand.push(player.deck.shift());
       drawn += 1;
     }
-    if (recycled > 0) logs.push(`${player.label}牌库摸空，将${recycled}张弃牌洗回牌库。`);
-    if (drawn > 0) logs.push(`${player.label}补摸${drawn}张牌。`);
-    if (drawLimit === 0) logs.push(`${player.label}手牌已满，不能继续摸牌。`);
-    if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}没有摸到牌。`);
+    if (recycled > 0) logs.push(`${player.label}鐗屽簱鎽哥┖锛屽皢${recycled}寮犲純鐗屾礂鍥炵墝搴撱€俙`);
+    if (drawn > 0) logs.push(`${player.label}琛ユ懜${drawn}寮犵墝銆俙`);
+    if (drawLimit === 0) logs.push(`${player.label}鎵嬬墝宸叉弧锛屼笉鑳界户缁懜鐗屻€俙`);
+    if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}娌℃湁鎽稿埌鐗屻€俙`);
   });
   return logs;
 }
@@ -1259,7 +1380,7 @@ function applyPollutionChange(player, delta) {
       player.discard.push(blessing);
       player.pollutionImmuneThisRound = true;
       player.cannotPlayThisRound = true;
-      logs.push(`${player.label}的《祖上的庇护》触发，本回合不受污染且不可出牌。`);
+      logs.push(`${player.label}鐨勩€婄涓婄殑搴囨姢銆嬭Е鍙戯紝鏈洖鍚堜笉鍙楁薄鏌撲笖涓嶅彲鍑虹墝銆俙`);
       return logs;
     }
   }
@@ -1289,14 +1410,14 @@ function runRoundStartEffects(players) {
       Object.values(players).forEach((player) => {
         logs.push(...applyBodySpiritDamage(player, 2));
       });
-      logs.push('信号塔触发，双方本体-2精神力。');
+      logs.push('淇″彿濉旇Е鍙戯紝鍙屾柟鏈綋-2绮剧鍔涖€?');
     }
     if (hasEquipment(owner, 'scene_vending_machine')) {
       logs.push(...applyPollutionChange(owner, 10));
       addSkill(owner, 1);
       logs.push(...applyPollutionChange(enemy, 15));
       addSkill(enemy, 1);
-      logs.push(`${owner.label}的贩卖机触发：己方+10污染+1技能点，对方+15污染+1技能点。`);
+      logs.push(`${owner.label}鐨勮穿鍗栨満瑙﹀彂锛氬繁鏂?10姹℃煋+1鎶€鑳界偣锛屽鏂?15姹℃煋+1鎶€鑳界偣銆俙`);
     }
     if (hasEquipment(owner, 'scene_darkness')) {
       Object.values(players).forEach((player) => {
@@ -1305,7 +1426,7 @@ function runRoundStartEffects(players) {
       });
       enemy.hp = clampHp(enemy.hp - 5);
       logs.push(...applyPollutionChange(enemy, 5));
-      logs.push(`${owner.label}的黑暗！触发：全员-5精神力+10污染，${enemy.label}额外-5血+5污染。`);
+      logs.push(`${owner.label}鐨勯粦鏆楋紒瑙﹀彂锛氬叏鍛?5绮剧鍔?10姹℃煋锛?{enemy.label}棰濆-5琛€+5姹℃煋銆俙`);
     }
   });
   return logs;
@@ -1317,7 +1438,7 @@ function runRoundEndEffects(players, currentTurn = null) {
     if (hasEquipment(player, 'scene_banquet')) {
       allBoardCharacters(player).forEach((character) => changeCharacterHp(character, 1));
       healPlayer(player, 4);
-      logs.push(`${player.label}的宴席触发：己方角色+1血，本体+4血。`);
+      logs.push(`${player.label}鐨勫甯Е鍙戯細宸辨柟瑙掕壊+1琛€锛屾湰浣?4琛€銆俙`);
     }
 
     const mountain = [...(player.scenes ?? []), ...player.hidden].find((card) => card.id === 'scene_mountain');
@@ -1332,7 +1453,7 @@ function runRoundEndEffects(players, currentTurn = null) {
       logs.push(...applyPollutionChange(player, -4));
       mountain.triggerCount = (mountain.triggerCount ?? 0) + 1;
       if (currentTurn != null) mountain.lastTriggeredTurn = currentTurn;
-      logs.push(`${player.label}的宀触发：己方角色+1血+1精神力，本体+3血+3精神力，污染-4。（${mountain.triggerCount}/${mountain.maxTriggers ?? 3}）`);
+      logs.push(`${player.label}鐨勫畝瑙﹀彂锛氬繁鏂硅鑹?1琛€+1绮剧鍔涳紝鏈綋+3琛€+3绮剧鍔涳紝姹℃煋-4銆傦紙${mountain.triggerCount}/${mountain.maxTriggers ?? 3}锛塦`);
     }
 
     allBoardCharacters(player).forEach((character) => {
@@ -1408,7 +1529,7 @@ function hasEquipment(player, id) {
 
 function isGearCard(card) {
   return Boolean(card.gear)
-    || card.tags?.includes('齿轮')
+    || card.tags?.includes('榻胯疆')
     || [
       'skill_transfer',
       'skill_memory_inspect',
@@ -1495,16 +1616,16 @@ function applyWordlessBookEffect(player, option, logs = []) {
   reduceMaxHp(player, 5);
   if (option === 'resetPollution') {
     player.pollution = 0;
-    logs.push(`${player.label}选择《无字天书》：污染重置到0，生命上限-5。`);
+    logs.push(`${player.label}閫夋嫨銆婃棤瀛楀ぉ涔︺€嬶細姹℃煋閲嶇疆鍒?锛岀敓鍛戒笂闄?5銆俙`);
     return logs;
   }
   if (option === 'heal') {
     healPlayer(player, 50);
-    logs.push(`${player.label}选择《无字天书》：本体+50血，生命上限-5。`);
+    logs.push(`${player.label}閫夋嫨銆婃棤瀛楀ぉ涔︺€嬶細鏈綋+50琛€锛岀敓鍛戒笂闄?5銆俙`);
     return logs;
   }
   logs.push(...applyBodySpiritHeal(player, 40));
-  logs.push(`${player.label}选择《无字天书》：本体+40精神力，生命上限-5。`);
+  logs.push(`${player.label}閫夋嫨銆婃棤瀛楀ぉ涔︺€嬶細鏈綋+40绮剧鍔涳紝鐢熷懡涓婇檺-5銆俙`);
   return logs;
 }
 
@@ -1543,7 +1664,7 @@ function restoreRewindSnapshot(player, logs = []) {
   Object.assign(player, snapshot);
   delete player.rewindSnapshot;
   delete player.rewindUntilTurn;
-  logs.push(`${player.label}的回朔之钟触发，恢复到记录时的数据。`);
+  logs.push(`${player.label}鐨勫洖鏈斾箣閽熻Е鍙戯紝鎭㈠鍒拌褰曟椂鐨勬暟鎹€俙`);
   return true;
 }
 
@@ -1561,7 +1682,7 @@ function triggerMetalCabinetIfAttack(defender, card, logs = []) {
   const [metalCabinet] = defender.hidden.splice(index, 1);
   defender.discard.push(metalCabinet);
   defender.physicalImmuneThisRound = true;
-  logs.push(`${defender.label}的《金属柜》触发，本回合不受物伤。`);
+  logs.push(`${defender.label}鐨勩€婇噾灞炴煖銆嬭Е鍙戯紝鏈洖鍚堜笉鍙楃墿浼ゃ€俙`);
   return true;
 }
 
@@ -1590,10 +1711,10 @@ function applyBodyDamage(player, amount, type = 'physical') {
 function applyCharacterDamage(players, ownerId, character, amount, type = 'physical') {
   const owner = players[ownerId];
   if ((type === 'physical' || type === 'characterPhysical') && owner.physicalImmuneThisRound) {
-    return { damage: 0, shieldNote: '金属柜生效，本次物伤无效。' };
+    return { damage: 0, shieldNote: '閲戝睘鏌滅敓鏁堬紝鏈鐗╀激鏃犳晥銆? '};
   }
   if (type === 'characterPhysical' && character.immuneCharacterDamage) {
-    return { damage: 0, shieldNote: '该角色免疫角色造成的伤害。' };
+    return { damage: 0, shieldNote: '璇ヨ鑹插厤鐤鑹查€犳垚鐨勪激瀹炽€? '};
   }
   let damage = amount;
   if (type === 'physical' || type === 'characterPhysical') damage = Math.round(damage * (1 - characterPhysicalReduction(owner, character)));
@@ -1602,9 +1723,9 @@ function applyCharacterDamage(players, ownerId, character, amount, type = 'physi
   if (type !== 'true' && (character.shield ?? 0) > 0 && owner.pollution < 60) {
     character.shield -= 1;
     damage = Math.max(0, damage - 5);
-    shieldNote = '护盾生效，伤害-5。';
+    shieldNote = '鎶ょ浘鐢熸晥锛屼激瀹?5銆?;'
   } else if (type !== 'true' && (character.shield ?? 0) > 0 && owner.pollution >= 60) {
-    shieldNote = '污染过高，护盾无效。';
+    shieldNote = '姹℃煋杩囬珮锛屾姢鐩炬棤鏁堛€?;'
   }
   if (character.currentHp != null) character.currentHp = clampHp(character.currentHp - damage);
   return { damage, shieldNote };
@@ -1633,7 +1754,7 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
     owner.discard.push(mindTransfer);
     mindTransferConsumed = true;
     transferredCharacters.push({ ...target, currentHp: target.currentHp ?? target.hp ?? 10 });
-    logs.push(`《意识转移》触发，${owner.label}夺舍了${enemy.label}的《${target.name}》。`);
+    logs.push(`銆婃剰璇嗚浆绉汇€嬭Е鍙戯紝${owner.label}澶鸿垗浜?{enemy.label}鐨勩€?{target.name}銆嬨€俙`);
     return true;
   };
   const triggerTravelersBlood = () => {
@@ -1649,7 +1770,7 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
         applyCharacterSpiritDamage(character, 5);
       });
     });
-    logs.push(`${owner.label}的《旅人的鲜血》触发，全员-5血-5精神力。`);
+    logs.push(`${owner.label}鐨勩€婃梾浜虹殑椴滆銆嬭Е鍙戯紝鍏ㄥ憳-5琛€-5绮剧鍔涖€俙`);
     return true;
   };
   owner.characters = owner.characters.filter((character) => {
@@ -1659,9 +1780,9 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
     triggerMindTransfer();
     if (hasEquipment(owner, 'scene_corpse_land')) {
       healPlayer(owner, 5);
-      logs.push(`${owner.label}的《食尸地》触发，本体+5血。`);
+      logs.push(`${owner.label}鐨勩€婇灏稿湴銆嬭Е鍙戯紝鏈綋+5琛€銆俙`);
     }
-    logs.push(`${owner.label}的《${character.name}》死亡。`);
+    logs.push(`${owner.label}鐨勩€?{character.name}銆嬫浜°€俙`);
     return false;
   });
 
@@ -1670,16 +1791,16 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
     if (boardZoneOf(card) !== 'characters' || ((card.currentHp == null || card.currentHp > 0) && (card.spirit == null || card.spirit > 0))) return true;
     if (card.id === 'hidden_wood_tree') {
       enemy.characters.push(makeCharacterState({ ...card, type: 'character', subType: undefined }));
-      logs.push(`《木树》死亡，变为${enemy.label}的角色。`);
+      logs.push(`銆婃湪鏍戙€嬫浜★紝鍙樹负${enemy.label}鐨勮鑹层€俙`);
     } else {
       owner.discard.push(card);
-      logs.push(`${owner.label}的暗置角色《${card.name}》死亡。`);
+      logs.push(`${owner.label}鐨勬殫缃鑹层€?{card.name}銆嬫浜°€俙`);
     }
     triggerTravelersBlood();
     triggerMindTransfer();
     if (hasEquipment(owner, 'scene_corpse_land')) {
       healPlayer(owner, 5);
-      logs.push(`${owner.label}的《食尸地》触发，本体+5血。`);
+      logs.push(`${owner.label}鐨勩€婇灏稿湴銆嬭Е鍙戯紝鏈綋+5琛€銆俙`);
     }
     return false;
   });
@@ -1697,7 +1818,7 @@ function applyDarknessStartTurn(players) {
     const enemy = players[opponentOf(owner.id)];
     enemy.hp = clampHp(enemy.hp - 5 * darknessCount);
     logs.push(...applyPollutionChange(enemy, 5 * darknessCount));
-    logs.push(`《黑暗!》触发：全员污染上升，敌方本体受损。`);
+    logs.push(`銆婇粦鏆?銆嬭Е鍙戯細鍏ㄥ憳姹℃煋涓婂崌锛屾晫鏂规湰浣撳彈鎹熴€俙`);
   });
   return logs;
 }
@@ -1719,7 +1840,7 @@ function applyAbandonedCarriage(players, currentTurn) {
           if (boardZoneOf(hidden) === 'characters' && hidden.currentHp != null) hidden.currentHp = clampHp(hidden.currentHp - 4);
         });
       });
-      logs.push(`《抛弃丰厢》触发：敌方本体-35，所有生物-4。`);
+      logs.push(`銆婃姏寮冧赴鍘€嬭Е鍙戯細鏁屾柟鏈綋-35锛屾墍鏈夌敓鐗?4銆俙`);
     });
   });
   Object.values(players).forEach((player) => cleanupDefeatedCharacters(players, player.id, logs));
@@ -1740,7 +1861,7 @@ function discardThenDrawOne(game, playerId, discardedCardId) {
   const player = players[playerId];
   const cardIndex = player.hand.findIndex((card) => card.instanceId === discardedCardId);
   if (cardIndex < 0) return game;
-  if (player.skill < 1) return { ...game, log: [`技能点不足，无法进行换牌。`, ...game.log] };
+  if (player.skill < 1) return { ...game, log: ['技能点不足，无法进行换牌。', ...game.log] };
 
   player.skill -= 1;
   const [removed] = player.hand.splice(cardIndex, 1);
@@ -1771,7 +1892,7 @@ function getActionActorCard(game) {
 function resolveCharacterAction(game, playerId, actorId, target) {
   const players = structuredClone(game.players);
   const player = players[playerId];
-  const enemyId = opponentOf(playerId);
+  const enemyId = target.enemyId ?? getPrimaryEnemyId(game, playerId);
   const enemy = players[enemyId];
   const actor = [
     ...player.characters,
@@ -1786,66 +1907,41 @@ function resolveCharacterAction(game, playerId, actorId, target) {
   if (target.type === 'shieldSelf') {
     actor.shield = (actor.shield ?? 0) + (actor.actionShield ?? 1);
     const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-    return {
-      ...nextGame,
-      actionState,
-      log: [`${player.label}的《${actor.name}》获得${actor.actionShield ?? 1}点护盾。`, ...game.log],
-    };
+    return { ...nextGame, actionState, log: [`${player.label}的《${actor.name}》获得${actor.actionShield ?? 1}点护盾。`, ...game.log] };
   }
 
   if (target.type === 'polluteEnemy') {
     const pollutionLogs = applyPollutionChange(enemy, actor.actionPolluteEnemy ?? 0);
     const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-    return {
-      ...nextGame,
-      actionState,
-      log: [...pollutionLogs, `${player.label}的《${actor.name}》使${enemy.label}+${actor.actionPolluteEnemy ?? 0}污染。`, ...game.log],
-    };
+    return { ...nextGame, actionState, log: [...pollutionLogs, `${player.label}的《${actor.name}》使${enemy.label}+${actor.actionPolluteEnemy ?? 0}污染。`, ...game.log] };
   }
 
   if (target.type === 'selfPolluteSkill') {
     const pollutionLogs = applyPollutionChange(player, actor.actionSelfPolluteForSkill ?? 20);
     addSkill(player, 1);
     const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-    return {
-      ...nextGame,
-      actionState,
-      log: [...pollutionLogs, `${player.label}的《${actor.name}》使自身+${actor.actionSelfPolluteForSkill ?? 20}污染，并获得1点技能点。`, ...game.log],
-    };
+    return { ...nextGame, actionState, log: [...pollutionLogs, `${player.label}的《${actor.name}》使自身+${actor.actionSelfPolluteForSkill ?? 20}污染，并获得1点技能点。`, ...game.log] };
   }
 
   if (target.type === 'spiritEnemy') {
     const spiritLogs = applyBodySpiritDamage(enemy, actor.actionSpiritDamage ?? 0);
     const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-    return {
-      ...nextGame,
-      actionState,
-      log: [...spiritLogs, `${player.label}的《${actor.name}》使${enemy.label}-${actor.actionSpiritDamage ?? 0}精神力。`, ...game.log],
-    };
+    return { ...nextGame, actionState, log: [...spiritLogs, `${player.label}的《${actor.name}》使${enemy.label}-${actor.actionSpiritDamage ?? 0}精神力。`, ...game.log] };
   }
 
   if (target.type === 'characterSpirit') {
     const targetCard = enemy.characters.find((card) => card.instanceId === target.instanceId);
-    if (!targetCard) return { ...game, log: [`目标已不存在。`, ...game.log] };
+    if (!targetCard) return { ...game, log: ['目标已不存在。', ...game.log] };
     applyCharacterSpiritDamage(targetCard, actor.actionSpiritDamage ?? 0);
     const defeatLogs = [];
     cleanupDefeatedCharacters(players, enemyId, defeatLogs);
     const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-    return {
-      ...nextGame,
-      actionState,
-      log: [`${player.label}的《${actor.name}》使${enemy.label}的《${targetCard.name}》-${actor.actionSpiritDamage ?? 0}精神力。`, ...defeatLogs, ...game.log],
-    };
+    return { ...nextGame, actionState, log: [`${player.label}的《${actor.name}》使${enemy.label}的《${targetCard.name}》-${actor.actionSpiritDamage ?? 0}精神力。`, ...defeatLogs, ...game.log] };
   }
 
-  if (actor.actionSkillCost && player.skill < actor.actionSkillCost) {
-    return { ...game, log: [`技能点不足，无法发动《${actor.name}》的行动技能。`, ...game.log] };
-  }
+  if (actor.actionSkillCost && player.skill < actor.actionSkillCost) return { ...game, log: [`技能点不足，无法发动《${actor.name}》的行动技能。`, ...game.log] };
   if (actor.actionSkillCost) player.skill -= actor.actionSkillCost;
-
-  if (actor.actionSelfSpiritCost) {
-    changeCharacterSpirit(actor, -actor.actionSelfSpiritCost);
-  }
+  if (actor.actionSelfSpiritCost) changeCharacterSpirit(actor, -actor.actionSelfSpiritCost);
 
   if (actor.actionEffect === 'itAction') {
     const targetCard = enemy.characters[0];
@@ -1861,11 +1957,7 @@ function resolveCharacterAction(game, playerId, actorId, target) {
     }
     cleanupDefeatedCharacters(players, playerId, logs);
     const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-    return {
-      ...nextGame,
-      actionState,
-      log: [...logs, ...game.log],
-    };
+    return { ...nextGame, actionState, log: [...logs, ...game.log] };
   }
 
   const damageBonus = actor.damageBonusVsCharacters ?? 0;
@@ -1883,12 +1975,8 @@ function resolveCharacterAction(game, playerId, actorId, target) {
     }
   } else {
     const targetCard = enemy.characters.find((card) => card.instanceId === target.instanceId);
-    if (!targetCard) {
-      return { ...game, log: [`目标已不存在。`, ...game.log] };
-    }
-    if (targetCard.untargetableByAttack) {
-      return { ...game, log: [`《${targetCard.name}》无法被普通攻击命中。`, ...game.log] };
-    }
+    if (!targetCard) return { ...game, log: ['目标已不存在。', ...game.log] };
+    if (targetCard.untargetableByAttack) return { ...game, log: [`《${targetCard.name}》无法被普通攻击命中。`, ...game.log] };
     const { damage: dealt, shieldNote } = applyCharacterDamage(players, enemyId, targetCard, damageToCharacter, 'characterPhysical');
     const defeatLogs = [];
     message = `${player.label}的《${actor.name}》对${enemy.label}的《${targetCard.name}》造成${dealt}点物伤。`;
@@ -1898,13 +1986,8 @@ function resolveCharacterAction(game, playerId, actorId, target) {
   }
 
   const actionState = game.actionState ? { ...game.actionState, cursor: game.actionState.cursor + 1 } : null;
-  return {
-    ...nextGame,
-    actionState,
-    log: [message, ...game.log],
-  };
+  return { ...nextGame, actionState, log: [message, ...game.log] };
 }
-
 function applyDamage(players, targetId, amount, sourceId) {
   const target = players[targetId];
   const source = players[sourceId];
@@ -2014,51 +2097,44 @@ function removeFromListByInstance(list, instanceId) {
 }
 
 function playSelectedEffectCard(game, playerId, card, selection) {
-  const players = structuredClone(game.players);
-  const paid = payAndRemoveHandCard(game, players, playerId, card);
+  const paid = payAndRemoveHandCard(game, structuredClone(game.players), playerId, card);
   if (!paid) return game;
   const { player, enemy, used, logs } = paid;
+  const players = structuredClone(game.players);
+  players[playerId] = player;
+  players[opponentOf(playerId)] = enemy;
   let message = `${player.label}使用《${used.name}》。`;
 
   if (used.effect === 'removeEnemyHidden') {
     const removed = removeFromListByInstance(enemy.hidden, selection.instanceId);
     if (removed) enemy.discard.push(removed);
-    message = removed
-      ? `${player.label}使用《${used.name}》，消除了${enemy.label}的暗置《${removed.name}》。`
-      : `${player.label}使用《${used.name}》，但目标暗置已不存在。`;
+    message = removed ? `${player.label}使用《${used.name}》，移除了${enemy.label}的暗置牌。` : `${player.label}使用《${used.name}》，但目标暗置已不存在。`;
   }
 
   if (used.effect === 'destroyEnemyScene') {
     const removed = removeFromListByInstance(enemy.scenes, selection.instanceId);
     if (removed) enemy.discard.push(removed);
-    message = removed
-      ? `${player.label}使用《${used.name}》，摧毁${enemy.label}的场景《${removed.name}》。`
-      : `${player.label}使用《${used.name}》，但目标场景已不存在。`;
+    message = removed ? `${player.label}使用《${used.name}》，摧毁了${enemy.label}的场景《${removed.name}》。` : `${player.label}使用《${used.name}》，但目标场景已不存在。`;
   }
 
   if (used.effect === 'memorySceneRemove') {
-    let removed = removeFromListByInstance(enemy.scenes, selection.instanceId);
-    if (!removed) removed = removeFromListByInstance(enemy.hidden, selection.instanceId);
+    const removed = removeFromListByInstance(enemy.scenes, selection.instanceId) || removeFromListByInstance(enemy.hidden, selection.instanceId);
     if (removed) enemy.discard.push(removed);
     logs.push(...applyBodySpiritDamage(enemy, 10));
     logs.push(...applyPollutionChange(enemy, 10));
-    message = removed
-      ? `${player.label}使用《${used.name}》，移除${enemy.label}的场景《${removed.name}》，并使其-10精神力+10污染。`
-      : `${player.label}使用《${used.name}》，目标场景已不存在，仍使${enemy.label}-10精神力+10污染。`;
+    message = removed ? `${player.label}使用《${used.name}》，移除了${enemy.label}的《${removed.name}》。` : `${player.label}使用《${used.name}》，目标已不存在。`;
   }
 
   if (used.effect === 'feedingContract') {
-    let removed = removeFromListByInstance(player.characters, selection.instanceId);
-    if (!removed) removed = removeFromListByInstance(player.hidden, selection.instanceId);
+    const removed = removeFromListByInstance(player.characters, selection.instanceId) || removeFromListByInstance(player.hidden, selection.instanceId);
     if (removed && !isGearCard(removed)) {
       player.discard.push(removed);
       healPlayer(player, 20);
       logs.push(...applyBodySpiritHeal(player, 8));
       addSkill(player, 1);
       message = `${player.label}使用《${used.name}》，移除己方《${removed.name}》，本体+20血+8精神力+1技能点。`;
-    } else if (removed) {
-      player.characters.push(removed);
-      message = `${player.label}使用《${used.name}》，但齿轮角色不能被投喂。`;
+    } else {
+      message = `${player.label}使用《${used.name}》，但目标不能被投喂。`;
     }
   }
 
@@ -2068,106 +2144,105 @@ function playSelectedEffectCard(game, playerId, card, selection) {
       target.shield = (target.shield ?? 0) + 1;
       message = `${player.label}使用《${used.name}》，给《${target.name}》增加1点护盾。`;
     } else {
-      message = `${player.label}使用《${used.name}》，但目标角色已经不存在。`;
+      message = `${player.label}使用《${used.name}》，但目标角色已不存在。`;
     }
   }
 
   player.discard.push(used);
   applyRewindIfDefeated(players, logs);
-  return {
-    ...game,
-    players,
-    log: [...logs, message, ...game.log],
-  };
+  return { ...game, players, log: [...logs, message, ...game.log] };
 }
 
 function playSelectedEnterCard(game, playerId, card, selection) {
   const players = structuredClone(game.players);
-  const paid = payAndRemoveHandCard(game, players, playerId, card);
-  if (!paid) return game;
-  const { player, enemy, used, logs } = paid;
+  const player = players[playerId];
+  const enemyId = selection.enemyId ?? getPrimaryEnemyId(game, playerId);
+  const enemy = players[enemyId];
+  const handIndex = player.hand.findIndex((item) => item.instanceId === card.instanceId);
+  if (handIndex < 0 || !enemy) return game;
+
+  const freeByRefrigeration = card.type === 'skill' && hasEquipment(player, 'scene_refrigeration') && !player.freeSkillUsed;
+  const freeByConsole = hasEquipment(player, 'scene_control_console') && !player.freeCardUsed;
+  const freePlay = freeByConsole || freeByRefrigeration;
+  if (!freePlay && player.skill < card.cost) return { ...game, log: [`技能点不足，无法使用《${card.name}》。`, ...game.log] };
+  if (!canPlayCard(game, playerId, card)) return game;
+
+  const [used] = player.hand.splice(handIndex, 1);
+  if (freePlay) {
+    if (freeByConsole) player.freeCardUsed = true;
+    else player.freeSkillUsed = true;
+  } else {
+    player.skill -= used.cost;
+  }
+
+  const logs = applyPollutionChange(player, effectivePollutionDelta(player, used));
+  triggerMetalCabinetIfAttack(enemy, used, logs);
   let message = `${player.label}使用《${used.name}》。`;
 
-  let placedCard = null;
   if (used.type === 'character') {
-    placedCard = makeCharacterState(used);
-    player.characters.push(placedCard);
-  } else if (isHiddenLike(used)) {
-    placedCard = boardZoneOf(used) === 'characters'
-      ? makeCharacterState(used)
-      : { ...used, currentHp: used.hp, shield: used.shield ?? 0 };
-    player.hidden.push({ ...placedCard, playedTurn: game.turn });
+    const played = makeCharacterState(used);
+    player.characters.push(played);
   } else if (used.type === 'equipment') {
     player.equipment.push(used);
   } else if (used.type === 'scene') {
     player.scenes.push(used);
   }
 
+  if (isHiddenLike(used)) {
+    const hiddenCard = boardZoneOf(used) === 'characters'
+      ? makeCharacterState(used)
+      : { ...used, currentHp: used.hp, shield: used.shield ?? 0 };
+    player.hidden.push({ ...hiddenCard, playedTurn: game.turn });
+  }
+
   if (used.effect === 'itEnter') {
-    const target = removeFromListByInstance(enemy.characters, selection.instanceId);
+    const target = enemy.characters.find((item) => item.instanceId === selection.instanceId);
     if (target) {
-      enemy.discard.push(target);
-      message = `${player.label}的《${used.name}》出场，${enemy.label}的《${target.name}》死亡。`;
+      target.currentHp = 0;
+      cleanupDefeatedCharacters(players, enemyId, logs);
+      message = `${player.label}使用《${used.name}》，使${enemy.label}的《${target.name}》死亡。`;
     } else {
-      message = `${player.label}的《${used.name}》出场，但目标角色已不存在。`;
+      message = `${player.label}使用《${used.name}》，但目标已不存在。`;
     }
   }
 
   if (used.effect === 'orcaEnter') {
-    let target = null;
-    if (selection.instanceId === '__played_self') {
-      target = placedCard;
-    } else {
-      target = player.characters.find((item) => item.instanceId === selection.instanceId)
-        ?? enemy.characters.find((item) => item.instanceId === selection.instanceId);
-    }
+    const target = enemy.characters.find((item) => item.instanceId === selection.instanceId);
     if (target) {
       target.shield = 0;
-      message = `${player.label}的《${used.name}》出场，使《${target.name}》护盾失效。`;
+      message = `${player.label}使用《${used.name}》，使${enemy.label}的《${target.name}》护盾消失。`;
     } else {
-      message = `${player.label}的《${used.name}》出场，但目标角色已不存在。`;
+      message = `${player.label}使用《${used.name}》，但目标已不存在。`;
     }
   }
 
+  if (!['character', 'equipment', 'scene'].includes(used.type) && !isHiddenLike(used)) player.discard.push(used);
   applyRewindIfDefeated(players, logs);
-  return {
-    ...game,
-    players,
-    log: [...logs, message, ...game.log],
-  };
+  return { ...game, players, log: [...logs, message, ...game.log] };
 }
 
 function resolveFallChoice(game, ownerId, option) {
   const players = structuredClone(game.players);
   const owner = players[ownerId];
-  const pending = owner.pendingFallChoice;
-  if (!pending) return game;
-  const enemyId = pending.enemyId ?? opponentOf(ownerId);
+  const choice = owner?.pendingFallChoice;
+  if (!owner || !choice) return game;
+  const enemyId = choice.enemyId ?? getPrimaryEnemyId(game, ownerId);
   const enemy = players[enemyId];
-  const card = owner.hidden.find((item) => item.instanceId === pending.cardInstanceId);
+  if (!enemy) return game;
+
   const logs = [];
-  if (!card) {
-    delete owner.pendingFallChoice;
-    return { ...game, players };
-  }
-
-  if (option === 'hp40') {
-    enemy.hp = clampHp(enemy.hp - 40);
-    logs.push(`${owner.label}选择《${card.name}》效果：${enemy.label}-40血。`);
-  } else {
+  const card = owner.hidden.find((item) => item.instanceId === choice.cardInstanceId);
+  if (option === 'spirit25') {
     logs.push(...applyBodySpiritDamage(enemy, 25));
-    logs.push(`${owner.label}选择《${card.name}》效果：${enemy.label}-25精神力。`);
+    logs.push(`${owner.label}的暗置《${card?.name ?? '坠落'}》触发，${enemy.label}-25精神力。`);
+  } else {
+    const dealt = applyBodyDamage(enemy, 40, 'true');
+    logs.push(`${owner.label}的暗置《${card?.name ?? '坠落'}》触发，${enemy.label}-${dealt}血。`);
   }
-
-  discardHiddenCard(owner, card);
+  if (card) discardHiddenCard(owner, card);
   delete owner.pendingFallChoice;
-  cleanupDefeatedCharacters(players, enemyId, logs);
   applyRewindIfDefeated(players, logs);
-  return {
-    ...game,
-    players,
-    log: [...logs, ...game.log],
-  };
+  return { ...game, players, log: [...logs, ...game.log] };
 }
 
 function playCard(game, playerId, card) {
@@ -2206,7 +2281,7 @@ function playCard(game, playerId, card) {
       actionCount: 1,
       playedTurn: game.turn,
     });
-    message = `${player.label}暗置了《${used.name}》。`;
+    message = `${player.label}使用《${used.name}》。`;
   } else if (used.type === 'character') {
     player.characters.push(makeCharacterState(used));
   }
@@ -2218,7 +2293,7 @@ function playCard(game, playerId, card) {
       ? makeCharacterState(used)
       : { ...used, currentHp: used.hp, shield: used.shield ?? 0 };
     player.hidden.push({ ...hiddenCard, playedTurn: game.turn });
-    message = `${player.label}暗置了《${used.name}》。`;
+    message = `${player.label}使用《${used.name}》。`;
   }
   if (used.effect === 'cleanedOne') {
     Object.values(players).forEach((item) => {
@@ -2236,33 +2311,33 @@ function playCard(game, playerId, card) {
         delete character.immuneCharacterDamage;
       });
     });
-    message = `${player.label}的《${used.name}》出场，改写了全场角色行动方式。`;
+    message = `${player.label}使用《${used.name}》。`;
   }
   if (used.effect === 'itEnter') {
     const target = enemy.characters[0];
     if (target) {
       target.currentHp = 0;
       cleanupDefeatedCharacters(players, enemyId, pollutionLogs);
-      message = `${player.label}的《${used.name}》出场，${enemy.label}的《${target.name}》死亡。`;
+      message = `${player.label}使用《${used.name}》，影响了《${target.name}》。`;
     } else {
-      message = `${player.label}的《${used.name}》出场，但${enemy.label}没有可选角色。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
   }
   if (used.effect === 'orcaEnter') {
     const target = enemy.characters[0] ?? player.characters.find((character) => character.instanceId !== used.instanceId);
     if (target) {
       target.shield = 0;
-      message = `${player.label}的《${used.name}》出场，使《${target.name}》护盾失效。`;
+      message = `${player.label}使用《${used.name}》，影响了《${target.name}》。`;
     }
   }
   if ((used.type === 'skill' || used.type === 'food') && !playedAsHidden) {
     if (used.effect === 'gainSkill') {
       addSkill(player, used.value);
-      message = `${player.label}使用《${used.name}》，获得${used.value}点技能点。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'healSelf') {
       healPlayer(player, used.value);
-      message = `${player.label}使用《${used.name}》，本体+${used.value}血。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'drawCards') {
       const drawn = drawCards(player, used.value, deck, players);
@@ -2270,20 +2345,20 @@ function playCard(game, playerId, card) {
     }
     if (used.effect === 'reduceSelfPollution') {
       pollutionLogs.push(...applyPollutionChange(player, -used.value));
-      message = `${player.label}使用《${used.name}》，污染-${used.value}。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'ziyou') {
       enemy.hp = clampHp(enemy.hp - 10);
       pollutionLogs.push(...applyPollutionChange(enemy, 35));
-      message = `${player.label}使用《${used.name}》，${enemy.label}-10血，+35污染。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'motherLove') {
       if (enemy.hand.length <= 3) {
         enemy.hp = clampHp(enemy.hp - 10);
         pollutionLogs.push(...applyPollutionChange(enemy, 90));
-        message = `${player.label}使用《${used.name}》，条件满足，${enemy.label}+90污染、-10血。`;
+        message = `${player.label}使用《${used.name}》。`;
       } else {
-        message = `${player.label}使用《${used.name}》，但${enemy.label}手牌多于3张。`;
+        message = `${player.label}使用《${used.name}》。`;
       }
     }
     if (used.effect === 'selfDestruct') {
@@ -2301,10 +2376,10 @@ function playCard(game, playerId, card) {
           }
         });
         cleanupDefeatedCharacters(players, enemyId, pollutionLogs);
-        message = `${player.label}使用《${used.name}》，敌方全体-15血。`;
+        message = `${player.label}使用《${used.name}》。`;
       } else {
         pollutionLogs.push(...applyPollutionChange(enemy, 50));
-        message = `${player.label}使用《${used.name}》，污染爆发不足${SELF_DESTRUCT_BURSTS}次，${enemy.label}+50污染。`;
+        message = `${player.label}使用《${used.name}》。`;
       }
     }
     if (used.effect === 'abyssGaze') {
@@ -2314,7 +2389,7 @@ function playCard(game, playerId, card) {
       });
       pollutionLogs.push(...applyPollutionChange(enemy, 20));
       Object.keys(players).forEach((id) => cleanupDefeatedCharacters(players, id, pollutionLogs));
-      message = `${player.label}使用《${used.name}》，${enemy.label}-10精神力，全场角色-5精神力，${enemy.label}+20污染。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'destroyEnemyScene') {
       const removed = removeFirstScene(enemy, false);
@@ -2337,7 +2412,7 @@ function playCard(game, playerId, card) {
     if (used.effect === 'trueBodyStrike') {
       enemy.hp = clampHp(enemy.hp - 40);
       pollutionLogs.push(...applyBodySpiritDamage(enemy, 40));
-      message = `${player.label}使用《${used.name}》，${enemy.label}-40血，-40精神力。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'removeEnemyHidden') {
       const removed = enemy.hidden.shift();
@@ -2382,7 +2457,7 @@ function playCard(game, playerId, card) {
         discard: player.discard,
       });
       player.rewindUntilTurn = game.turn + 1;
-      message = `${player.label}使用《${used.name}》，记录了当前自身数据。`;
+      message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'wordlessBook') {
       const choiceLogs = [];
@@ -2391,7 +2466,7 @@ function playCard(game, playerId, card) {
       message = `${player.label}使用《${used.name}》。`;
     }
     if (used.effect === 'inspectAllHidden') {
-      message = `${player.label}使用《${used.name}》，查看了全场暗置牌。`;
+      message = `${player.label}使用《${used.name}》。`;
       player.discard.push(used);
       return {
         ...game,
@@ -2404,9 +2479,9 @@ function playCard(game, playerId, card) {
       const target = player.characters[0] ?? player.hidden.find((card) => boardZoneOf(card) === 'characters');
       if (target) {
         target.shield = (target.shield ?? 0) + 1;
-        message = `${player.label}使用《${used.name}》，给《${target.name}》增加1点护盾。`;
+        message = `${player.label}使用《${used.name}》，影响了《${target.name}》。`;
       } else {
-        message = `${player.label}使用《${used.name}》，但没有可加护盾的己方角色。`;
+        message = `${player.label}使用《${used.name}》。`;
       }
     }
     if (used.effect === 'damageEnemy') message = applyDamage(players, enemyId, used.value, playerId);
@@ -2425,7 +2500,7 @@ function playCard(game, playerId, card) {
       enemy.hp = clampHp(enemy.hp - teleportHpLoss);
       extraLogs.push(`${enemy.label}因《传送》-${teleportHpLoss}血。`);
 
-      message = `${player.label}使用《传送》，弃置己方${discardedByPlayer}张齿轮牌、敌方${discardedByEnemy}张齿轮牌；${extraDiscarded ? `${enemy.label}额外弃置《${extraDiscarded.name}》。` : `${enemy.label}没有手牌可额外弃置。`}本次共弃置${totalDiscardedCards}张牌，双方+${20 + totalDiscardedCards * 10}污染，${enemy.label}-${teleportHpLoss}血。`;
+      message = `${player.label}使用《传送》，弃置己方${discardedByPlayer}张齿轮牌、敌方${discardedByEnemy}张齿轮牌，${extraDiscarded ? `${enemy.label}额外弃置《${extraDiscarded.name}》` : `${enemy.label}没有手牌可额外弃置`}。本次共弃置${totalDiscardedCards}张牌，双方+${20 + totalDiscardedCards * 10}污染，${enemy.label}-${teleportHpLoss}血。`;
       player.discard.push(used);
       return {
         ...game,
@@ -2456,7 +2531,7 @@ function playCard(game, playerId, card) {
 function playTargetedKill(game, playerId, card, target) {
   const players = structuredClone(game.players);
   const player = players[playerId];
-  const enemyId = opponentOf(playerId);
+  const enemyId = target.enemyId ?? getPrimaryEnemyId(game, playerId);
   const enemy = players[enemyId];
   const handIndex = player.hand.findIndex((item) => item.instanceId === card.instanceId);
   if (handIndex < 0) return game;
@@ -2471,21 +2546,11 @@ function playTargetedKill(game, playerId, card, target) {
   if (target.type === 'body') {
     const dealt = applyBodyDamage(enemy, 40, 'physical');
     applyRewindIfDefeated(players, pollutionLogs);
-    return {
-      ...game,
-      players,
-      log: [...pollutionLogs, `${player.label}使用《${used.name}》，对${enemy.label}本体造成${dealt}点物伤。`, ...game.log],
-    };
+    return { ...game, players, log: [...pollutionLogs, `${player.label}使用《${used.name}》，对${enemy.label}本体造成${dealt}点物伤。`, ...game.log] };
   }
 
   const targetIndex = enemy.characters.findIndex((item) => item.instanceId === target.instanceId);
-  if (targetIndex < 0) {
-    return {
-      ...game,
-      players,
-      log: [...pollutionLogs, `${player.label}使用《${used.name}》，但目标已经不存在。`, ...game.log],
-    };
-  }
+  if (targetIndex < 0) return { ...game, players, log: [...pollutionLogs, `${player.label}使用《${used.name}》，但目标已经不存在。`, ...game.log] };
 
   const targetCard = enemy.characters[targetIndex];
   const deathLogs = [];
@@ -2493,11 +2558,7 @@ function playTargetedKill(game, playerId, card, target) {
   if (shieldNote) deathLogs.push(shieldNote);
   cleanupDefeatedCharacters(players, enemyId, deathLogs);
   applyRewindIfDefeated(players, deathLogs);
-  return {
-    ...game,
-    players,
-    log: [...pollutionLogs, `${player.label}使用《${used.name}》，对${enemy.label}的《${targetCard.name}》造成${dealt}点物伤。`, ...deathLogs, ...game.log],
-  };
+  return { ...game, players, log: [...pollutionLogs, `${player.label}使用《${used.name}》，对${enemy.label}的《${targetCard.name}》造成${dealt}点物伤。`, ...deathLogs, ...game.log] };
 }
 function performAction(game, playerId) {
   const players = structuredClone(game.players);
@@ -2544,17 +2605,20 @@ function App() {
   const [selectedPlayer, setSelectedPlayer] = useState('p1');
   const [selectedHandCardId, setSelectedHandCardId] = useState(null);
   const [detailCard, setDetailCard] = useState(null);
+  const [detailPlayerId, setDetailPlayerId] = useState(null);
   const [targetRequest, setTargetRequest] = useState(null);
   const [cycleRequest, setCycleRequest] = useState(null);
   const [netPanelOpen, setNetPanelOpen] = useState(false);
-  const [netStatus, setNetStatus] = useState('未连接');
+  const [netStatus, setNetStatus] = useState('鏈繛鎺?');
   const [netRole, setNetRole] = useState(null);
   const [localSeat, setLocalSeat] = useState('p1');
   const [offerText, setOfferText] = useState('');
   const [answerText, setAnswerText] = useState('');
   const [signalInput, setSignalInput] = useState('');
-  const [lanUrl, setLanUrl] = useState('ws://192.168.1.100:8781');
+  const [lanUrl, setLanUrl] = useState(DEFAULT_RELAY_URL);
   const [lanRoom, setLanRoom] = useState('room1');
+  const [roomList, setRoomList] = useState([]);
+  const [roomListState, setRoomListState] = useState({ status: 'idle', message: '' });
   const [netError, setNetError] = useState('');
   const [netReady, setNetReady] = useState({ local: false, remote: false });
   const [p2pStarted, setP2pStarted] = useState(false);
@@ -2590,20 +2654,24 @@ function App() {
       audio.src = '';
     };
   }, [settings.musicEnabled, settings.musicUrl]);
-  const defeated = Object.values(game.players).find((player) => player.hp <= 0);
-  const victor = defeated ? game.players[opponentOf(defeated.id)] : null;
+
+  useEffect(() => {
+    if (screen !== 'game' || mode !== 'relay' || !netPanelOpen) return;
+    loadRooms();
+  }, [screen, mode, netPanelOpen, lanUrl]);
+
+  const victor = getWinner(game, localSeat);
   const pendingFallEntry = Object.entries(game.players).find(([, player]) => player.pendingFallChoice);
   const pendingFallOwnerId = pendingFallEntry?.[0] ?? null;
   const pendingFallOwner = pendingFallEntry?.[1] ?? null;
 
   const visiblePlayer = game.players[selectedPlayer];
-  const enemy = game.players[opponentOf(selectedPlayer)];
+  const enemy = game.players[getPrimaryEnemyId(game, selectedPlayer)];
   const isActivePerspective = selectedPlayer === currentPlayer;
   const isP2p = mode === 'p2p';
-  const isLan = mode === 'lan';
-  const isNetwork = isP2p || isLan;
+  const isNetwork = isRelayNetworkMode(mode);
   const isLocalTurn = !isNetwork || selectedPlayer === localSeat;
-  const isAiTurn = mode === 'pve' && currentPlayer === 'p2' && !victor;
+  const isAiTurn = isAiControlledSeat(mode, currentPlayer, localSeat) && !victor;
   const actionActor = getActionActorCard(game);
 
   const canNetPlay = !isNetwork || p2pStarted;
@@ -2619,7 +2687,7 @@ function App() {
   const canCycle = isActivePerspective && isLocalTurn && canNetPlay && !isAiTurn && !blocksForPendingChoice && visiblePlayer.skill >= 1 && visiblePlayer.hand.length > 0;
 
   const statusText = useMemo(() => {
-    if (victor) return `${victor.label}获胜`;
+    if (victor) return `${victor.label}鑾疯儨`;
     return phaseLabel(game);
   }, [game, victor]);
 
@@ -2629,7 +2697,7 @@ function App() {
     window.localStorage.setItem(PLAYER_NAME_KEY, cleaned);
     setGame((current) => {
       const nextGame = structuredClone(current);
-      const seat = mode === 'p2p' ? localSeat : 'p1';
+      const seat = isRelayNetworkMode(mode) ? localSeat : 'p1';
       nextGame.players[seat].label = cleaned;
       if (mode === 'pve') nextGame.players.p2.label = 'Bot';
       sendNetName(seat, cleaned);
@@ -2639,18 +2707,18 @@ function App() {
 
   useEffect(() => {
     if (mode === 'pve' && selectedPlayer !== 'p1') setSelectedPlayer('p1');
-    if ((mode === 'p2p' || mode === 'lan') && selectedPlayer !== localSeat) setSelectedPlayer(localSeat);
+    if (isRelayNetworkMode(mode) && selectedPlayer !== localSeat) setSelectedPlayer(localSeat);
   }, [mode, localSeat, selectedPlayer]);
 
   useEffect(() => {
-    if (mode !== 'p2p' && mode !== 'lan') return;
+    if (!isRelayNetworkMode(mode)) return;
     sendNetName(localSeat, playerName);
   }, [mode, localSeat, playerName]);
 
   useEffect(() => {
     if (!victor || recordedMatchRef.current === game.matchId) return;
     recordedMatchRef.current = game.matchId;
-    const statSeat = mode === 'p2p' || mode === 'lan' ? localSeat : 'p1';
+    const statSeat = isRelayNetworkMode(mode) ? localSeat : 'p1';
     setStats((current) => {
       const next = {
         wins: current.wins + (victor.id === statSeat ? 1 : 0),
@@ -2659,7 +2727,12 @@ function App() {
       saveStats(next);
       return next;
     });
-  }, [victor, game.matchId, mode, localSeat]);
+    submitLeaderboardResult({
+      name: game.players[statSeat]?.label || playerName,
+      result: victor.id === statSeat ? 'win' : 'loss',
+      mode,
+    }).catch(() => {});
+  }, [victor, game.matchId, mode, localSeat, game.players, playerName]);
 
   useEffect(() => {
     if (screen !== 'game') {
@@ -2693,11 +2766,12 @@ function App() {
 
   function resetGame(nextMode = mode) {
     setMode(nextMode);
-    const nextSeat = nextMode === 'p2p' || nextMode === 'lan' ? localSeat : 'p1';
+    const nextSeat = isRelayNetworkMode(nextMode) ? localSeat : 'p1';
     recordedMatchRef.current = null;
     setGame(setupGame({ mode: nextMode, localName: playerName, localSeat: nextSeat, customCards: settings.developerCards }));
     setSelectedPlayer(nextSeat);
     setDetailCard(null);
+    setDetailPlayerId(null);
     setTargetRequest(null);
     setCycleRequest(null);
     setCoinReady(false);
@@ -2719,8 +2793,8 @@ function App() {
       setCoinIntro(false);
       setPhaseBanner(phaseLabel(game));
     }, 1450);
-    setPhaseBanner(nextMode === 'pve' ? '人机对战' : nextMode === 'p2p' ? 'P2P 联机' : nextMode === 'lan' ? '局域网联机' : '双人对战');
-    if (nextMode === 'p2p' || nextMode === 'lan') {
+    setPhaseBanner(modeLabel(nextMode));
+    if (isRelayNetworkMode(nextMode)) {
       setNetPanelOpen(true);
       return;
     }
@@ -2803,39 +2877,74 @@ function App() {
       peerRef.current.close();
       peerRef.current = null;
     }
-    setNetStatus('未连接');
+    setNetStatus('鏈繛鎺?');
     setNetRole(null);
     setNetError('');
     setNetReady({ local: false, remote: false });
     setP2pStarted(false);
   }
 
-  function connectLan() {
+  async function loadRooms() {
+    if (mode !== 'relay') return;
+    setRoomListState({ status: 'loading', message: '正在刷新房间...' });
+    try {
+      const response = await fetch(roomApiUrlFromWs(lanUrl), { cache: 'no-store' });
+      if (!response.ok) throw new Error(`房间列表读取失败：${response.status}`);
+      const data = await response.json();
+      setRoomList(Array.isArray(data.rooms) ? data.rooms : []);
+      setRoomListState({ status: 'ready', message: '' });
+    } catch (error) {
+      setRoomListState({ status: 'error', message: error instanceof Error ? error.message : '房间列表读取失败。' });
+    }
+  }
+
+  function connectLan(options = {}) {
+    const roomName = options.room || lanRoom.trim() || 'room1';
     closePeerConnection();
     setNetError('');
     setNetReady({ local: false, remote: false });
     setP2pStarted(false);
     try {
       const url = normalizeLanUrl(lanUrl);
-      url.searchParams.set('room', lanRoom.trim() || 'room1');
+      url.searchParams.set('room', roomName);
       url.searchParams.set('name', playerName);
+      if (options.host) url.searchParams.set('host', '1');
+      setLanRoom(roomName);
       const socket = new WebSocket(url.toString());
       channelRef.current = socket;
       socket.onopen = () => {
-        setNetStatus('局域网已连接');
+        setNetStatus(mode === 'relay' ? '服务器已连接，等待对手...' : '局域网已连接');
+        setNetRole(options.host ? 'host' : 'joiner');
         setNetReady((ready) => ({ ...ready, local: true }));
         socket.send(JSON.stringify({ type: 'name', seat: localSeat, name: playerName }));
       };
-      socket.onclose = () => setNetStatus('局域网已断开');
-      socket.onerror = () => setNetError('连接失败。HTTPS 网页必须使用 wss://，请确认服务器支持 WSS，或在 APK/HTTP 页面里连接 ws://。');
+      socket.onclose = () => {
+        setNetStatus(mode === 'relay' ? '服务器已断开' : '局域网已断开');
+        if (mode === 'relay') loadRooms();
+      };
+      socket.onerror = () => setNetError('连接失败。HTTPS 页面必须使用 wss://；如果用域名，请确认 Nginx 已把 /ws 反代到 18781。');
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          if (message.type === 'ping') {
+            socket.send(JSON.stringify({ type: 'pong' }));
+            return;
+          }
+          if (message.type === 'error') {
+            setNetError(message.message || '服务器返回错误。');
+            return;
+          }
+          if (message.type === 'peer-left') {
+            setNetStatus('对方已离开');
+            setP2pStarted(false);
+            if (mode === 'relay') loadRooms();
+            return;
+          }
           if (message.type === 'seat') {
             socket.localSeat = message.seat;
             setLocalSeat(message.seat);
             setSelectedPlayer(message.seat);
-            setGame(setupGame({ mode: 'lan', localName: playerName, localSeat: message.seat }));
+            setGame(setupGame({ mode, localName: playerName, localSeat: message.seat }));
           }
           if (message.type === 'lan-ready') {
             setNetReady({ local: true, remote: true });
@@ -2860,27 +2969,46 @@ function App() {
             applyRemoteName(message.seat, message.name);
           }
         } catch (error) {
-          setNetError('接收局域网数据失败');
+          setNetError('接收联机数据失败。');
         }
       };
     } catch (error) {
-      setNetError(error instanceof Error ? error.message : '联机地址无法识别，例如 192.168.1.5:8781 或 example.com:8781');
+      setNetError(error instanceof Error ? error.message : '联机地址无法识别，例如 ws://duoduo1215.xyz:18781。');
     }
   }
 
+  function createRelayRoom() {
+    const room = makeRoomId(playerName);
+    setLanRoom(room);
+    connectLan({ room, host: true });
+  }
+
+  function joinRelayRoom(room) {
+    if (!room) return;
+    setLanRoom(room);
+    connectLan({ room, host: false });
+  }
   function attachChannel(channel) {
     channelRef.current = channel;
     channel.onopen = () => {
-      setNetStatus('已连接');
+      setNetStatus('宸茶繛鎺?');
       setNetError('');
       sendNetState(game);
       sendNetName(localSeat, playerName);
     };
-    channel.onclose = () => setNetStatus('连接已断开');
-    channel.onerror = () => setNetStatus('连接异常');
+    channel.onclose = () => setNetStatus('杩炴帴宸叉柇寮€');
+    channel.onerror = () => setNetStatus('杩炴帴寮傚父');
     channel.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        if (message.type === 'ping') {
+          channel.send(JSON.stringify({ type: 'pong' }));
+          return;
+        }
+        if (message.type === 'error') {
+          setNetError(message.message || '鑱旀満閿欒');
+          return;
+        }
         if (message.type === 'state' && message.game) {
           suppressNetSyncRef.current = true;
           setGame(message.game);
@@ -2896,7 +3024,7 @@ function App() {
           applyRemoteName(message.seat, message.name);
         }
       } catch (error) {
-        setNetError('接收联机数据失败');
+        setNetError('接收联机数据失败。');
       }
     };
   }
@@ -2970,9 +3098,9 @@ function App() {
           p2: { ...current.players.p2, label: playerName },
         },
       }));
-      setNetStatus('等待对方接收');
+      setNetStatus('绛夊緟瀵规柟鎺ユ敹');
     } catch (error) {
-      setNetError('房间信息解析失败');
+      setNetError('鎴块棿淇℃伅瑙ｆ瀽澶辫触');
     }
   }
 
@@ -2984,9 +3112,9 @@ function App() {
       const peer = peerRef.current;
       if (!peer) throw new Error('missing peer');
       await peer.setRemoteDescription(answer);
-      setNetStatus('连接已完成');
+      setNetStatus('杩炴帴宸插畬鎴?');
     } catch (error) {
-      setNetError('回答信息解析失败');
+      setNetError('鍥炵瓟淇℃伅瑙ｆ瀽澶辫触');
     }
   }
 
@@ -3002,16 +3130,16 @@ function App() {
         await acceptAnswer(signalInput);
         return;
       }
-      setNetError('没有识别到 offer 或 answer。');
+      setNetError('娌℃湁璇嗗埆鍒?offer 鎴?answer銆?');
     } catch (error) {
-      setNetError('联机码解析失败');
+      setNetError('鑱旀満鐮佽В鏋愬け璐?');
     }
   }
 
   function markLocalReady() {
     const channel = channelRef.current;
     if (!channel || channel.readyState !== 'open') {
-      setNetError('先连上对方，再点准备。');
+      setNetError('鍏堣繛涓婂鏂癸紝鍐嶇偣鍑嗗銆?');
       return;
     }
     setNetReady((ready) => ({ ...ready, local: true }));
@@ -3020,7 +3148,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (screen !== 'game' || (mode !== 'p2p' && mode !== 'lan') || p2pStarted) return;
+    if (screen !== 'game' || !isRelayNetworkMode(mode) || p2pStarted) return;
     if (!netReady.local || !netReady.remote) return;
     setP2pStarted(true);
     setNetPanelOpen(false);
@@ -3036,10 +3164,10 @@ function App() {
     const timer = window.setTimeout(() => {
       if (currentStep === 'play') {
         const allowCycle = aiCyclePhaseRef.current !== phaseKey;
-        const preview = playAiCard(game, 'p2');
+        const preview = playAiCard(game, currentPlayer);
         if (!preview.played) {
           updateGame((current) => {
-            const stepResult = runAiStep(current, 'p2', { allowCycle });
+            const stepResult = runAiStep(current, currentPlayer, { allowCycle });
             if (stepResult.cycled) aiCyclePhaseRef.current = phaseKey;
             return stepResult.game;
           }, { sync: false });
@@ -3047,12 +3175,12 @@ function App() {
         }
         setPlayFx({ card: preview.card, id: `ai-${Date.now()}` });
         window.setTimeout(() => {
-          updateGame((current) => runAiStep(current, 'p2', { allowCycle: false }).game, { sync: false });
+          updateGame((current) => runAiStep(current, currentPlayer, { allowCycle: false }).game, { sync: false });
           setPlayFx(null);
         }, 680);
         return;
       }
-      updateGame((current) => runAiStep(current, 'p2', { allowCycle: false }).game, { sync: false });
+      updateGame((current) => runAiStep(current, currentPlayer, { allowCycle: false }).game, { sync: false });
     }, currentStep === 'play' ? 720 : 820);
     return () => window.clearTimeout(timer);
   }, [
@@ -3064,16 +3192,17 @@ function App() {
     game.turn,
     game.matchId,
     game.actionState?.cursor,
-    game.players.p2.hand.length,
-    game.players.p2.skill,
-    game.players.p2.pollution,
+    game.players[currentPlayer]?.hand.length,
+    game.players[currentPlayer]?.skill,
+    game.players[currentPlayer]?.pollution,
     game.log.length,
     currentStep,
+    currentPlayer,
   ]);
 
   useEffect(() => {
     if (screen !== 'game') return;
-    const text = victor ? `${victor.label} 获胜` : phaseLabel(game);
+    const text = victor ? `${victor.label} 鑾疯儨` : phaseLabel(game);
     setPhaseBanner(text);
     const timer = window.setTimeout(() => setPhaseBanner(null), 900);
     return () => window.clearTimeout(timer);
@@ -3102,13 +3231,22 @@ function App() {
     updateGame((current) => {
       const actor = getActionActorCard(current);
       if (!actor) return nextPhase(current);
-      return advanceActionCursor(current, `${current.players[selectedPlayer].label}跳过了《${actor.name}》的行动。`);
+      return advanceActionCursor(current, `${current.players[selectedPlayer].label}璺宠繃浜嗐€?{actor.name}銆嬬殑琛屽姩銆俙`);
     });
   }
 
   function handleHandCard(card) {
-    if (!canPlay || victor || !canPlayCard(game, selectedPlayer, card)) {
+    const reason = victor
+      ? '瀵瑰眬宸茬粡缁撴潫銆?'
+      : !canPlay
+        ? '鐜板湪涓嶆槸浣犵殑鍑虹墝闃舵銆?'
+        : getCannotPlayReason(game, selectedPlayer, card);
+    if (reason) {
       if (selectedHandCardId === card.instanceId) setSelectedHandCardId(null);
+      updateGame((current) => ({
+        ...current,
+        log: [`涓嶈兘浣跨敤銆?{card.name}銆嬶細${reason}`, ...current.log],
+      }), { sync: false });
       return;
     }
     if (selectedHandCardId !== card.instanceId) {
@@ -3178,7 +3316,8 @@ function App() {
     if (!interactive) setSelectedHandCardId(null);
   }
 
-  const perspectiveIds = mode === 'pvp' ? ['p1', 'p2'] : [mode === 'p2p' || mode === 'lan' ? localSeat : 'p1'];
+  const perspectiveIds = mode === 'pvp' ? ['p1', 'p2'] : [isRelayNetworkMode(mode) ? localSeat : 'p1'];
+  const isFourPlayer = isFourPlayerMode(mode);
 
   if (screen === 'start') {
     return (
@@ -3218,13 +3357,13 @@ function App() {
           <button
             className="top-tool-button"
             onClick={backToStart}
-            aria-label="重新开始"
+            aria-label="回到主界面"
           >
             <RotateCcw size={17} />
             <span>主界面</span>
           </button>
           <div>
-            <p>第 {game.turn} 回合</p>
+            <p>第{game.turn}回合</p>
             <h1>{statusText}</h1>
           </div>
           <button className="top-tool-button" onClick={() => setCoinReady(true)} aria-label="抛硬币动画">
@@ -3263,7 +3402,7 @@ function App() {
           <DamageHeartBurst key={burst.id} burst={burst} />
         ))}
 
-        {netPanelOpen && (mode === 'p2p' || mode === 'lan') && (
+        {netPanelOpen && isRelayNetworkMode(mode) && (
           <P2PPanel
             mode={mode}
             status={netStatus}
@@ -3273,6 +3412,8 @@ function App() {
             signalInput={signalInput}
             lanUrl={lanUrl}
             lanRoom={lanRoom}
+            rooms={roomList}
+            roomListState={roomListState}
             error={netError}
             ready={netReady}
             onClose={() => setNetPanelOpen(false)}
@@ -3281,6 +3422,9 @@ function App() {
             onAcceptAnswer={acceptAnswer}
             onApplySignalInput={applySignalInput}
             onConnectLan={connectLan}
+            onCreateRelayRoom={createRelayRoom}
+            onJoinRelayRoom={joinRelayRoom}
+            onRefreshRooms={loadRooms}
             onLanUrlChange={setLanUrl}
             onLanRoomChange={setLanRoom}
             onReady={markLocalReady}
@@ -3291,9 +3435,9 @@ function App() {
           />
         )}
 
-        <section className="switcher" aria-label="玩家视角">
+        <section className="switcher" aria-label="鐜╁瑙嗚">
           <span className="mode-badge">
-            {mode === 'pve' ? '人机对战' : mode === 'p2p' ? 'P2P 联机' : mode === 'lan' ? '局域网' : '双人对战'}
+            {modeLabel(mode)}
           </span>
           {perspectiveIds.map((id) => (
             <button
@@ -3306,39 +3450,97 @@ function App() {
           ))}
         </section>
 
-        <section className="battlefield">
-          <PlayerArea
-            player={enemy}
-            perspective="enemy"
-            inspected={game.inspected}
-            onInspect={setDetailCard}
-          />
+        {isFourPlayer ? (
+          <section className="battlefield battlefield-four">
+            <FourPlayerSeat
+              className="seat-left"
+              player={game.players.p2}
+              selected={currentPlayer === 'p2'}
+              perspective="enemy"
+              inspected={game.inspected}
+              onSelect={() => setDetailPlayerId('p2')}
+              onInspect={setDetailCard}
+            />
+            <FourPlayerSeat
+              className="seat-top"
+              player={game.players.p3}
+              selected={currentPlayer === 'p3'}
+              perspective={mode === 'team4' ? 'ally' : 'enemy'}
+              inspected={game.inspected}
+              onSelect={() => setDetailPlayerId('p3')}
+              onInspect={setDetailCard}
+            />
+            <FourPlayerSeat
+              className="seat-right"
+              player={game.players.p4}
+              selected={currentPlayer === 'p4'}
+              perspective="enemy"
+              inspected={game.inspected}
+              onSelect={() => setDetailPlayerId('p4')}
+              onInspect={setDetailCard}
+            />
 
-          <section className="center-panel">
-            <div className="phase-chip">
-              <Zap size={15} />
-              {phaseLabel(game)}
-              {canAction && actionActor ? ` · ${actionActor.name}` : ''}
-            </div>
-            <button className="primary-action turn-action" onClick={advance} disabled={!canUsePhaseButton}>
-              <Play size={17} />
-              {isAiTurn ? 'AI行动中' : !isActivePerspective ? '切到当前玩家' : canAction ? (actionActor ? '选择目标' : '结束行动') : '进入下一阶段'}
-            </button>
-            {canAction && actionActor ? (
-              <button className="mini-action turn-skip-action" onClick={skipCurrentAction} disabled={!canUsePhaseButton}>
-                <ChevronRight size={15} />
-                跳过行动
+            <section className="center-panel center-panel-four">
+              <div className="phase-chip">
+                <Zap size={15} />
+                {phaseLabel(game)}
+                {canAction && actionActor ? ` · ${actionActor.name}` : ''}
+              </div>
+              <button className="primary-action turn-action" onClick={advance} disabled={!canUsePhaseButton}>
+                <Play size={17} />
+                {isAiTurn ? 'AI行动中' : !isActivePerspective ? '切到当前玩家' : canAction ? (actionActor ? '选择目标' : '结束行动') : '进入下一阶段'}
               </button>
-            ) : null}
-          </section>
+              {canAction && actionActor ? (
+                <button className="mini-action turn-skip-action" onClick={skipCurrentAction} disabled={!canUsePhaseButton}>
+                  <ChevronRight size={15} />
+                  跳过行动
+                </button>
+              ) : null}
+            </section>
 
-          <PlayerArea
-            player={visiblePlayer}
-            perspective="self"
-            inspected={game.inspected}
-            onInspect={setDetailCard}
-          />
-        </section>
+            <FourPlayerSeat
+              className="seat-self"
+              player={game.players.p1}
+              selected={currentPlayer === 'p1'}
+              perspective="self"
+              inspected={game.inspected}
+              onSelect={() => setDetailPlayerId('p1')}
+              onInspect={setDetailCard}
+            />
+          </section>
+        ) : (
+          <section className="battlefield">
+            <PlayerArea
+              player={enemy}
+              perspective="enemy"
+              inspected={game.inspected}
+              onInspect={setDetailCard}
+            />
+            <section className="center-panel">
+              <div className="phase-chip">
+                <Zap size={15} />
+                {phaseLabel(game)}
+                {canAction && actionActor ? ` · ${actionActor.name}` : ''}
+              </div>
+              <button className="primary-action turn-action" onClick={advance} disabled={!canUsePhaseButton}>
+                <Play size={17} />
+                {isAiTurn ? 'AI行动中' : !isActivePerspective ? '切到当前玩家' : canAction ? (actionActor ? '选择目标' : '结束行动') : '进入下一阶段'}
+              </button>
+              {canAction && actionActor ? (
+                <button className="mini-action turn-skip-action" onClick={skipCurrentAction} disabled={!canUsePhaseButton}>
+                  <ChevronRight size={15} />
+                  跳过行动
+                </button>
+              ) : null}
+            </section>
+            <PlayerArea
+              player={visiblePlayer}
+              perspective="self"
+              inspected={game.inspected}
+              onInspect={setDetailCard}
+            />
+          </section>
+        )}
 
         <section className="hand-tray">
           <div className="hand-title">
@@ -3359,6 +3561,13 @@ function App() {
                 card={card}
                 selected={selectedHandCardId === card.instanceId}
                 disabled={!canPlay || Boolean(victor) || !canPlayCard(game, selectedPlayer, card)}
+                disabledReason={
+                  victor
+                    ? '对局已经结束。'
+                    : !canPlay
+                      ? '现在不是你的出牌阶段。'
+                      : getCannotPlayReason(game, selectedPlayer, card)
+                }
                 onClick={() => handleHandCard(card)}
                 onInspect={() => setDetailCard(card)}
               />
@@ -3370,14 +3579,14 @@ function App() {
           <button
             className="drawer-toggle"
             onClick={() => setDrawerOpen((open) => !open)}
-            aria-label={drawerOpen ? '收起提示' : '打开提示'}
+            aria-label={drawerOpen ? '鏀惰捣鎻愮ず' : '鎵撳紑鎻愮ず'}
           >
             {drawerOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
           <div className="drawer-content">
             <header>
-              <strong>对局提示</strong>
-              <span>{mode === 'pve' ? '人机' : mode === 'lan' ? '局域网' : '双人'}</span>
+              <strong>瀵瑰眬鎻愮ず</strong>
+              <span>{modeLabel(mode)}</span>
             </header>
             <p className="drawer-status">{statusText}</p>
             <div className="drawer-log">
@@ -3390,6 +3599,16 @@ function App() {
 
         {detailCard && (
           <CardDetail card={detailCard} onClose={() => setDetailCard(null)} />
+        )}
+
+        {detailPlayerId && game.players[detailPlayerId] && (
+          <PlayerDetailOverlay
+            player={game.players[detailPlayerId]}
+            perspective={detailPlayerId === 'p1' ? 'self' : 'enemy'}
+            inspected={game.inspected}
+            onClose={() => setDetailPlayerId(null)}
+            onInspect={setDetailCard}
+          />
         )}
 
         {pendingFallOwnerId && pendingFallOwner && (!isNetwork || pendingFallOwnerId === localSeat) && !(mode === 'pve' && pendingFallOwnerId === 'p2') && (
@@ -3420,7 +3639,7 @@ function App() {
         {targetRequest && !['wordlessBook', 'selectCard'].includes(targetRequest.type) && (
           <TargetPicker
             card={targetRequest.card ?? targetRequest.actor}
-            enemy={game.players[opponentOf(targetRequest.playerId)]}
+            enemies={getEnemyIds(game, targetRequest.playerId).map((id) => game.players[id]).filter(Boolean)}
             actor={targetRequest.actor}
             onCancel={() => setTargetRequest(null)}
             onSelect={resolveTarget}
@@ -3447,6 +3666,8 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
   const [devCard, setDevCard] = useState({ name: '', type: 'skill', artName: '', artDataUrl: '', code: '' });
   const [updateState, setUpdateState] = useState({ status: 'idle', message: '', result: null });
   const [updateProgress, setUpdateProgress] = useState(0);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardState, setLeaderboardState] = useState({ status: 'idle', players: [], message: '' });
 
   useEffect(() => {
     setDraftName(playerName);
@@ -3503,14 +3724,14 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       setUpdateState({
         status: result.hasUpdate ? 'ready' : 'current',
         message: result.hasUpdate
-          ? `发现新版 ${result.tag || result.version}，当前 ${APP_VERSION}`
+          ? `发现新版本 ${result.tag || result.version}，当前 ${APP_VERSION}`
           : `已经是最新版本：${APP_VERSION}`,
         result,
       });
     } catch (error) {
       setUpdateState({
         status: 'error',
-        message: error instanceof Error ? error.message : '检查更新失败',
+        message: error instanceof Error ? error.message : '检查更新失败。',
         result: null,
       });
     }
@@ -3546,7 +3767,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       setUpdateState((current) => ({
         ...current,
         status: 'error',
-        message: error instanceof Error ? error.message : '下载安装失败',
+        message: error instanceof Error ? error.message : '下载安装失败。',
       }));
       setUpdateProgress(0);
     }
@@ -3581,6 +3802,22 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
     }));
   }
 
+  async function loadLeaderboard() {
+    setLeaderboardOpen(true);
+    setLeaderboardState((current) => ({ ...current, status: 'loading', message: '正在读取排行榜...' }));
+    const controller = new AbortController();
+    try {
+      const players = await fetchLeaderboard(controller.signal);
+      setLeaderboardState({ status: 'ready', players, message: players.length ? '' : '排行榜暂时没有记录。' });
+    } catch (error) {
+      setLeaderboardState({
+        status: 'error',
+        players: [],
+        message: error instanceof Error ? error.message : '排行榜读取失败。',
+      });
+    }
+  }
+
   function readDeveloperArt(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -3608,7 +3845,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       }}
     >
       <section className="start-screen">
-        <button className="start-settings-button" onClick={() => setSettingsOpen((open) => !open)} aria-label="设置名字">
+        <button className="start-settings-button" onClick={() => setSettingsOpen((open) => !open)} aria-label="璁剧疆鍚嶅瓧">
           <Cog size={18} />
           <span>{playerName}</span>
         </button>
@@ -3714,7 +3951,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
             </button>
             <details className="advanced-ui-settings">
               <summary>高级界面设置</summary>
-              <label htmlFor="hand-card-scale">手牌卡牌大小 70-180%</label>
+              <label htmlFor="hand-card-scale">鎵嬬墝鍗＄墝澶у皬 70-180%</label>
               <input
                 id="hand-card-scale"
                 type="number"
@@ -3723,7 +3960,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.handCardScale ?? DEFAULT_SETTINGS.handCardScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handCardScale: event.target.value }))}
               />
-              <label htmlFor="hand-gap">手牌间距 -40 到 80</label>
+              <label htmlFor="hand-gap">鎵嬬墝闂磋窛 -40 鍒?80</label>
               <input
                 id="hand-gap"
                 type="number"
@@ -3732,7 +3969,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.handGap ?? DEFAULT_SETTINGS.handGap}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handGap: event.target.value }))}
               />
-              <label htmlFor="hand-text-scale">手牌文字大小 50-200%</label>
+              <label htmlFor="hand-text-scale">鎵嬬墝鏂囧瓧澶у皬 50-200%</label>
               <input
                 id="hand-text-scale"
                 type="number"
@@ -3741,7 +3978,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.handTextScale ?? DEFAULT_SETTINGS.handTextScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handTextScale: event.target.value }))}
               />
-              <label htmlFor="board-card-scale">场上卡牌大小 70-180%</label>
+              <label htmlFor="board-card-scale">鍦轰笂鍗＄墝澶у皬 70-180%</label>
               <input
                 id="board-card-scale"
                 type="number"
@@ -3750,7 +3987,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, boardCardScale: event.target.value }))}
               />
-              <label htmlFor="start-scale">主界面大小 60-160%</label>
+              <label htmlFor="start-scale">涓荤晫闈㈠ぇ灏?60-160%</label>
               <input
                 id="start-scale"
                 type="number"
@@ -3759,7 +3996,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.startScale ?? DEFAULT_SETTINGS.startScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, startScale: event.target.value }))}
               />
-              <label htmlFor="game-offset-x">游戏窗口左右移动 -300 到 300</label>
+              <label htmlFor="game-offset-x">娓告垙绐楀彛宸﹀彸绉诲姩 -300 鍒?300</label>
               <input
                 id="game-offset-x"
                 type="number"
@@ -3768,7 +4005,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.gameOffsetX ?? DEFAULT_SETTINGS.gameOffsetX}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, gameOffsetX: event.target.value }))}
               />
-              <label htmlFor="game-offset-y">游戏窗口上下移动 -300 到 300</label>
+              <label htmlFor="game-offset-y">娓告垙绐楀彛涓婁笅绉诲姩 -300 鍒?300</label>
               <input
                 id="game-offset-y"
                 type="number"
@@ -3856,7 +4093,27 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
           <strong>统计信息</strong>
           <span>胜利 {stats.wins}</span>
           <span>失败 {stats.losses}</span>
+          <button type="button" className="mini-action leaderboard-button" onClick={loadLeaderboard}>排行榜</button>
         </div>
+        {leaderboardOpen && (
+          <section className="leaderboard-panel">
+            <header>
+              <strong>排行榜</strong>
+              <button type="button" className="mini-action" onClick={() => setLeaderboardOpen(false)}>关闭</button>
+            </header>
+            {leaderboardState.status === 'loading' ? <p>{leaderboardState.message}</p> : null}
+            {leaderboardState.message && leaderboardState.status !== 'loading' ? <p>{leaderboardState.message}</p> : null}
+            <div className="leaderboard-list">
+              {leaderboardState.players.slice(0, 10).map((player, index) => (
+                <div className="leaderboard-row" key={`${player.name}-${index}`}>
+                  <span>{index + 1}</span>
+                  <strong>{player.name}</strong>
+                  <em>{player.wins}胜 / {player.losses}败</em>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="start-actions">
           <button className="start-card primary" onClick={() => onStart('pve')}>
             <strong>人机对战</strong>
@@ -3868,11 +4125,23 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
           </button>
           <button className="start-card" onClick={() => onStart('p2p')}>
             <strong>P2P 联机</strong>
-            <span>手动交换信令后即可远程对局。</span>
+            <span>手动交换信令后远程对局。</span>
           </button>
           <button className="start-card" onClick={() => onStart('lan')}>
             <strong>局域网联机</strong>
-            <span>同一 Wi-Fi 下连接房间，不用复制 P2P 长码。</span>
+            <span>同一 Wi-Fi 下连接房间，默认端口 18781。</span>
+          </button>
+          <button className="start-card" onClick={() => onStart('relay')}>
+            <strong>服务器联机</strong>
+            <span>通过服务器大厅创建或加入房间。</span>
+          </button>
+          <button className="start-card" onClick={() => onStart('ffa4')}>
+            <strong>4人自由战</strong>
+            <span>你在右下角操作自己，另外三个座位由 AI 控制。</span>
+          </button>
+          <button className="start-card" onClick={() => onStart('team4')}>
+            <strong>4人组队战</strong>
+            <span>P1+P3 对 P2+P4，其余座位先由 AI 控制。</span>
           </button>
         </div>
       </section>
@@ -3895,15 +4164,15 @@ function VictoryOverlay({ victor, onRestart, onHome }) {
   return (
     <div className="victory-overlay" aria-live="assertive">
       <article className="victory-panel">
-        <span className="victory-kicker">胜负已定</span>
-        <h2>{victor.label} 获胜</h2>
+        <span className="victory-kicker">鑳滆礋宸插畾</span>
+        <h2>{victor.label} 鑾疯儨</h2>
         <div className="victory-shine" aria-hidden="true" />
         <div className="victory-actions">
           <button className="primary-action" onClick={onRestart}>
-            再来一局
+            鍐嶆潵涓€灞€
           </button>
           <button className="mini-action" onClick={onHome}>
-            回主菜单
+            鍥炰富鑿滃崟
           </button>
         </div>
       </article>
@@ -3920,6 +4189,8 @@ function P2PPanel({
   signalInput,
   lanUrl,
   lanRoom,
+  rooms,
+  roomListState,
   error,
   ready,
   onClose,
@@ -3928,6 +4199,9 @@ function P2PPanel({
   onAcceptAnswer,
   onApplySignalInput,
   onConnectLan,
+  onCreateRelayRoom,
+  onJoinRelayRoom,
+  onRefreshRooms,
   onLanUrlChange,
   onLanRoomChange,
   onReady,
@@ -3944,7 +4218,7 @@ function P2PPanel({
         </button>
         <header className="p2p-header">
           <div>
-            <h2>{mode === 'lan' ? '局域网联机' : 'P2P 联机'}</h2>
+            <h2>{modeLabel(mode)}</h2>
             <p>{status}{role ? ` · ${role === 'host' ? '房主' : '加入方'}` : ''}</p>
           </div>
           <div className="p2p-actions">
@@ -3960,20 +4234,64 @@ function P2PPanel({
             </button>
           </div>
         ) : null}
-        {mode === 'lan' ? (
-          <section className="lan-panel">
-            <label>
-              服务器地址
-              <input value={lanUrl} onChange={(event) => onLanUrlChange(event.target.value)} placeholder="ws://电脑IP:8781" />
-            </label>
-            <label>
-              房间号
-              <input value={lanRoom} onChange={(event) => onLanRoomChange(event.target.value)} placeholder="room1" />
-            </label>
-            <button className="primary-action" onClick={onConnectLan}>连接局域网房间</button>
-            <p>运行 npm run lan 可启动联机服务器，默认端口 8781。自定义端口运行 npm run lan -- --port 9000。</p>
-            <p>可填局域网 IP、服务器域名、公网 IP 或内网穿透地址，例如 192.168.1.5:8781、example.com:8781、wss://example.com/ws。两台设备房间号要一致。</p>
-          </section>
+        {mode !== 'p2p' ? (
+          mode === 'relay' ? (
+            <section className="room-lobby">
+              <div className="room-server-card">
+                <label>
+                  服务器地址
+                  <input value={lanUrl} onChange={(event) => onLanUrlChange(event.target.value)} placeholder="ws://duoduo1215.xyz:18781" />
+                </label>
+                <button className="mini-action" onClick={onRefreshRooms}>刷新房间</button>
+              </div>
+
+              <div className="room-create-card">
+                <div>
+                  <span className="room-kicker">快速开局</span>
+                  <h3>创建房间</h3>
+                  <p>创建后会连接服务器并显示你的名字，其他玩家可以在下面的房间列表点击加入。</p>
+                </div>
+                <button className="primary-action" onClick={onCreateRelayRoom}>创建房间</button>
+              </div>
+
+              <div className="room-list-head">
+                <strong>可加入房间</strong>
+                <span>{rooms?.length ? `${rooms.length} 个等待中` : '暂无房间'}</span>
+              </div>
+              <div className="room-list">
+                {roomListState?.status === 'loading' ? <p className="room-message">正在刷新房间...</p> : null}
+                {roomListState?.message ? <p className="room-message error">{roomListState.message}</p> : null}
+                {rooms?.length ? rooms.map((room) => (
+                  <button className="room-card" key={room.id} onClick={() => onJoinRelayRoom(room.id)}>
+                    <span className="room-avatar">{String(room.hostName || '玩').slice(0, 1)}</span>
+                    <span className="room-main">
+                      <strong>{room.hostName || '玩家'}</strong>
+                      <em>房间 {room.id}</em>
+                    </span>
+                    <span className="room-count">{room.players}/{room.maxPlayers}</span>
+                  </button>
+                )) : roomListState?.status !== 'loading' ? (
+                  <div className="room-empty">
+                    <strong>还没有房间</strong>
+                    <span>你可以先创建一个，别人刷新后就能看到。</span>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          ) : (
+            <section className="lan-panel">
+              <label>
+                局域网地址
+                <input value={lanUrl} onChange={(event) => onLanUrlChange(event.target.value)} placeholder="ws://电脑IP:18781" />
+              </label>
+              <label>
+                房间号
+                <input value={lanRoom} onChange={(event) => onLanRoomChange(event.target.value)} placeholder="room1" />
+              </label>
+              <button className="primary-action" onClick={() => onConnectLan()}>连接局域网房间</button>
+              <p>运行 npm run relay:18781 可启动联机服务器，默认端口 18781。</p>
+            </section>
+          )
         ) : (
           <div className="p2p-grid">
           <section>
@@ -3994,8 +4312,7 @@ function P2PPanel({
             <button className="mini-action" onClick={onCopyAnswer} disabled={!answerText}>再复制一次</button>
           </section>
           </div>
-        )}
-        {error ? <p className="p2p-error">{error}</p> : null}
+        )}        {error ? <p className="p2p-error">{error}</p> : null}
       </article>
     </div>
   );
@@ -4007,6 +4324,110 @@ function PlayerArea({ player, perspective, inspected, onInspect }) {
     <section className={`player-area ${isEnemy ? 'enemy' : 'self'}`}>
       <PlayerBoard player={player} perspective={perspective} inspected={inspected} onInspect={onInspect} />
       <BattleLine player={player} compact={isEnemy} isEnemy={isEnemy} onInspect={onInspect} />
+    </section>
+  );
+}
+
+function FourPlayerSeat({ player, perspective, selected, className = '', inspected, onSelect, onInspect }) {
+  if (!player) return null;
+  const hpLimit = player.maxHp ?? PLAYER_BASE_HP;
+  const spiritLimit = player.maxSpirit ?? PLAYER_BASE_SPIRIT;
+  const pollutionLimit = player.maxPollution ?? INITIAL_POLLUTION_LIMIT;
+  const portraitCard = player.characters[0] ?? player.hidden.find((card) => boardZoneOf(card) === 'characters');
+  const hiddenPortrait = perspective !== 'self' && portraitCard?.type === 'hidden';
+  const markers = [
+    { className: 'marker-character', count: player.characters.length + player.hidden.filter((card) => boardZoneOf(card) === 'characters').length },
+    { className: 'marker-scene', count: player.scenes.length + player.hidden.filter((card) => boardZoneOf(card) === 'scenes').length },
+    { className: 'marker-equipment', count: player.equipment.length + player.hidden.filter((card) => boardZoneOf(card) === 'equipment').length },
+    { className: 'marker-hidden', count: player.hidden.length },
+  ];
+
+  return (
+    <button className={`four-seat ${className} ${selected ? 'selected' : ''}`} onClick={onSelect}>
+      <div className="four-seat-stats">
+        <strong>{player.label}</strong>
+        <span className="mini-stat life">鈾?{player.hp}/{hpLimit}</span>
+        <span className="mini-stat spirit">鈼?{player.spirit ?? spiritLimit}/{spiritLimit}</span>
+        <span className="mini-stat pollution">鈼?{player.pollution}/{pollutionLimit}</span>
+      </div>
+      <div className="four-seat-portrait">
+        {portraitCard ? (
+          hiddenPortrait ? <img src={cardBackUrl} alt="" /> : <CardArt card={portraitCard} className="four-seat-art" />
+        ) : (
+          <div className="default-avatar" />
+        )}
+      </div>
+      <div className="four-seat-markers" aria-hidden="true">
+        {markers.map((marker) => (
+          <span key={marker.className} className={marker.className}>{marker.count}</span>
+        ))}
+      </div>
+      <div className="four-seat-cards">
+        <SlotGroup icon={<Shield size={12} />} title="瑁呭" cards={player.equipment} limit={2} mode={perspective === 'self' ? 'mini' : 'mini'} onInspect={onInspect} />
+        <SlotGroup icon={<Zap size={12} />} title="鍦烘櫙" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
+        <SlotGroup
+          icon={<Eye size={12} />}
+          title="鏆楃疆"
+          cards={player.hidden}
+          limit={2}
+          mode={perspective === 'self' ? 'mini' : 'hidden'}
+          revealCards={inspected?.viewer === 'p1' ? inspected.cards : []}
+          onInspect={onInspect}
+        />
+      </div>
+    </button>
+  );
+}
+
+function PlayerDetailOverlay({ player, perspective, inspected, onClose, onInspect }) {
+  const isSelf = perspective === 'self';
+  const hiddenCards = isSelf ? player.hidden : [];
+  return (
+    <div className="detail-overlay player-detail-overlay" onClick={onClose}>
+      <article className="player-detail-panel" onClick={(event) => event.stopPropagation()}>
+        <button className="detail-close" onClick={onClose} aria-label="鍏抽棴">
+          <X size={18} />
+        </button>
+        <header className="player-detail-header">
+          <strong>{player.label}</strong>
+          <div className="player-detail-stats">
+            <span className="mini-stat life">鈾?{player.hp}/{player.maxHp ?? PLAYER_BASE_HP}</span>
+            <span className="mini-stat spirit">鈼?{player.spirit ?? player.maxSpirit ?? PLAYER_BASE_SPIRIT}/{player.maxSpirit ?? PLAYER_BASE_SPIRIT}</span>
+            <span className="mini-stat pollution">鈼?{player.pollution}/{player.maxPollution ?? INITIAL_POLLUTION_LIMIT}</span>
+            <span className="mini-stat">鉁?{player.skill}</span>
+          </div>
+        </header>
+        <div className="player-detail-zones">
+          <DetailZone title="瑙掕壊" cards={player.characters} emptyText="娌℃湁鏄庣疆瑙掕壊" onInspect={onInspect} />
+          <DetailZone title="瑁呭" cards={player.equipment} emptyText="娌℃湁瑁呭" onInspect={onInspect} />
+          <DetailZone title="鍦烘櫙" cards={player.scenes ?? []} emptyText="娌℃湁鍦烘櫙" onInspect={onInspect} />
+          <DetailZone
+            title="鏆楃疆"
+            cards={hiddenCards}
+            emptyText={isSelf ? '没有暗置牌' : '对方暗置不可见'}
+            hidden={!isSelf}
+            onInspect={onInspect}
+          />
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function DetailZone({ title, cards, emptyText, hidden = false, onInspect }) {
+  return (
+    <section className="detail-zone">
+      <h3>{title}</h3>
+      <div className="detail-zone-cards">
+        {hidden ? <div className="detail-zone-empty">{emptyText}</div> : null}
+        {!hidden && cards.length === 0 ? <div className="detail-zone-empty">{emptyText}</div> : null}
+        {!hidden && cards.map((card) => (
+          <button className="detail-zone-card" key={card.instanceId} onClick={() => onInspect(card)}>
+            <CardArt card={card} className="detail-zone-art" />
+            <span>{card.name}</span>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
@@ -4023,35 +4444,34 @@ function PlayerBoard({ player, perspective, inspected, onInspect }) {
       <div className="player-stat">
         <strong>{player.label}</strong>
       </div>
-      <div className="life-meter" aria-label={`生命 ${player.hp} / ${hpLimit}`}>
+      <div className="life-meter" aria-label={`鐢熷懡 ${player.hp} / ${hpLimit}`}>
         <div className="meter-label">
-          <span>生命</span>
+          <span>鐢熷懡</span>
           <span>{player.hp} / {hpLimit}</span>
         </div>
         <div className="meter-track meter-life">
           <div className="meter-fill" style={{ width: `${Math.min(player.hp, hpLimit) / hpLimit * 100}%` }} />
         </div>
       </div>
-      <div className="spirit-meter" aria-label={`精神力 ${spiritValue} / ${spiritLimit}`}>
+      <div className="spirit-meter" aria-label={`绮剧鍔?${spiritValue} / ${spiritLimit}`}>
         <div className="meter-label spirit-label">
           <span>
             <img src={spiritIconUrl} alt="" />
-            精神力
-          </span>
+            绮剧鍔?          </span>
           <span>{spiritValue} / {spiritLimit}</span>
         </div>
         <div className="meter-track meter-spirit">
           <div className="meter-fill" style={{ width: `${Math.min(spiritValue, spiritLimit) / spiritLimit * 100}%` }} />
         </div>
       </div>
-      <div className="skill-chip" aria-label={`技能点 ${player.skill}`}>
+      <div className="skill-chip" aria-label={`鎶€鑳界偣 ${player.skill}`}>
         <img src={skillIconUrl} alt="" />
         <span>{player.skill}</span>
-        <small>技能点</small>
+        <small>鎶€鑳界偣</small>
       </div>
-      <div className="pollution-meter" aria-label={`污染 ${player.pollution} / ${pollutionLimit}`}>
+      <div className="pollution-meter" aria-label={`姹℃煋 ${player.pollution} / ${pollutionLimit}`}>
         <div className="pollution-label">
-          <span>污染</span>
+          <span>姹℃煋</span>
           <span>{player.pollution} / {pollutionLimit}</span>
         </div>
         <div className="pollution-track">
@@ -4059,11 +4479,11 @@ function PlayerBoard({ player, perspective, inspected, onInspect }) {
         </div>
       </div>
       <div className="slots">
-        <SlotGroup icon={<Shield size={14} />} title="装备" cards={player.equipment} limit={2} mode="mini" onInspect={onInspect} />
-        <SlotGroup icon={<Zap size={14} />} title="场景" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
+        <SlotGroup icon={<Shield size={14} />} title="瑁呭" cards={player.equipment} limit={2} mode="mini" onInspect={onInspect} />
+        <SlotGroup icon={<Zap size={14} />} title="鍦烘櫙" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
         <SlotGroup
           icon={<Eye size={14} />}
-          title="暗置"
+          title="鏆楃疆"
           cards={player.hidden}
           limit={2}
           mode={isEnemy ? 'hidden' : 'mini'}
@@ -4124,13 +4544,13 @@ function SlotGroup({ icon, title, cards, limit, mode, revealCards = [], onInspec
                 key={card.instanceId}
                 onClick={() => reveal ? onInspect(reveal) : null}
               >
-                {reveal ? <span>{reveal.name}</span> : <span>暗置</span>}
+                {reveal ? <span>{reveal.name}</span> : <span>鏆楃疆</span>}
               </button>
             );
           }
           return (
             <button className={`small-card ${card.type}`} key={card.instanceId} onClick={() => onInspect(card)}>
-              {(card.gear || card.tags?.includes('齿轮')) && <Cog className="small-gear" size={12} aria-label="齿轮标记" />}
+              {(card.gear || card.tags?.includes('榻胯疆')) && <Cog className="small-gear" size={12} aria-label="榻胯疆鏍囪" />}
               <span>{card.name}</span>
             </button>
           );
@@ -4140,14 +4560,14 @@ function SlotGroup({ icon, title, cards, limit, mode, revealCards = [], onInspec
   );
 }
 
-function CardMini({ card, disabled, selected = false, onClick, onInspect }) {
-  const hasGear = card.gear || card.tags?.includes('齿轮');
+function CardMini({ card, disabled, disabledReason = '', selected = false, onClick, onInspect }) {
+  const hasGear = card.gear || card.tags?.includes('榻胯疆');
   return (
-    <div className={`hand-card-wrap ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}`}>
+    <div className={`hand-card-wrap ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}`} title={disabledReason}>
       <button
         className={`card-mini framed-card ${card.type}`}
         style={{ '--card-frame': `url(${cardFrameUrl})` }}
-        disabled={disabled}
+        aria-disabled={disabled}
         onClick={onClick}
       >
           <span className="frame-cost">{card.cost}</span>
@@ -4155,7 +4575,7 @@ function CardMini({ card, disabled, selected = false, onClick, onInspect }) {
           {card.valueText && <span className="frame-value">{card.valueText}</span>}
           <CardArt card={card} />
           {hasGear && (
-            <span className="frame-gear" title="齿轮标记" aria-label="齿轮标记">
+            <span className="frame-gear" title="榻胯疆鏍囪" aria-label="榻胯疆鏍囪">
               <Cog size={13} />
             </span>
         )}
@@ -4163,11 +4583,11 @@ function CardMini({ card, disabled, selected = false, onClick, onInspect }) {
         <small className="frame-type">{CARD_TYPES[card.type]}</small>
         {isCharacterLike(card) && (
           <em className="frame-stats">
-            {card.atk} 攻 / {card.hp == null ? '特殊' : `${card.hp} 血`}
+            {card.atk} 鏀?/ {card.hp == null ? '鐗规畩' : `${card.hp} 琛€`}
           </em>
         )}
       </button>
-      <button className="inspect-card" onClick={onInspect} aria-label={`查看${card.name}`}>
+      <button className="inspect-card" onClick={onInspect} aria-label={`鏌ョ湅${card.name}`}>
         <Info size={15} />
       </button>
     </div>
@@ -4178,27 +4598,27 @@ function targetEffectSummary(card, actor) {
   if (actor) {
     const parts = [];
     const damage = actor.actionDamage ?? actor.actionBodyDamage ?? actor.actionCharacterDamage ?? actor.atk ?? 0;
-    if (damage > 0) parts.push(`${damage}点物伤`);
-    if (actor.actionSpiritDamage) parts.push(`-${actor.actionSpiritDamage}精神力`);
-    if (actor.actionPolluteEnemy) parts.push(`+${actor.actionPolluteEnemy}污染`);
-    if (actor.actionShield) parts.push(`自身+${actor.actionShield}护盾`);
-    if (actor.actionEffect === 'itAction') parts.push('选择一个角色死亡');
-    return parts.join(' / ') || '选择目标';
+    if (damage > 0) parts.push(`${damage}鐐圭墿浼`);
+    if (actor.actionSpiritDamage) parts.push(`-${actor.actionSpiritDamage}绮剧鍔沗`);
+    if (actor.actionPolluteEnemy) parts.push(`+${actor.actionPolluteEnemy}姹℃煋`);
+    if (actor.actionShield) parts.push(`鑷韩+${actor.actionShield}鎶ょ浘`);
+    if (actor.actionEffect === 'itAction') parts.push('閫夋嫨涓€涓鑹叉浜?');
+    return parts.join(' / ') || '閫夋嫨鐩爣';
   }
-  if (!card) return '选择目标';
-  if (card.effect === 'killTarget') return '40点物伤';
-  if (card.effect === 'removeEnemyHidden') return '消除一张暗置';
-  if (card.effect === 'destroyEnemyScene') return '摧毁一张场景牌';
-  if (card.effect === 'memorySceneRemove') return '移除场景，-10精神力，+10污染';
-  if (card.effect === 'feedingContract') return '移除我方非齿轮角色，本体+20血+8精神力+1技能点';
-  if (card.effect === 'shieldCard') return '选择一个己方角色+1护盾';
-  if (card.effect === 'itEnter') return '选择对方一个角色死亡';
-  if (card.effect === 'orcaEnter') return '选择对方角色，护盾失效';
-  return card.text ?? '选择目标';
+  if (!card) return '閫夋嫨鐩爣';
+  if (card.effect === 'killTarget') return '40鐐圭墿浼?;'
+  if (card.effect === 'removeEnemyHidden') return '娑堥櫎涓€寮犳殫缃?;'
+  if (card.effect === 'destroyEnemyScene') return '鎽ф瘉涓€寮犲満鏅墝';
+  if (card.effect === 'memorySceneRemove') return '绉婚櫎鍦烘櫙锛?10绮剧鍔涳紝+10姹℃煋';
+  if (card.effect === 'feedingContract') return '绉婚櫎鎴戞柟闈為娇杞鑹诧紝鏈綋+20琛€+8绮剧鍔?1鎶€鑳界偣';
+  if (card.effect === 'shieldCard') return '閫夋嫨涓€涓繁鏂硅鑹?1鎶ょ浘';
+  if (card.effect === 'itEnter') return '閫夋嫨瀵规柟涓€涓鑹叉浜?;'
+  if (card.effect === 'orcaEnter') return '閫夋嫨瀵规柟瑙掕壊锛屾姢鐩惧け鏁?;'
+  return card.text ?? '閫夋嫨鐩爣';
 }
 
 function PlayCardBurst({ card }) {
-  const hasGear = card.gear || card.tags?.includes('齿轮');
+  const hasGear = card.gear || card.tags?.includes('榻胯疆');
   return (
     <div className="play-card-burst" aria-hidden="true">
       <div
@@ -4218,7 +4638,7 @@ function PlayCardBurst({ card }) {
         <small className="frame-type">{CARD_TYPES[card.type]}</small>
         {isCharacterLike(card) && (
           <em className="frame-stats">
-            {card.atk} 攻 / {card.hp == null ? '特殊' : `${card.hp} 血`}
+            {card.atk} 鏀?/ {card.hp == null ? '鐗规畩' : `${card.hp} 琛€`}
           </em>
         )}
       </div>
@@ -4240,24 +4660,24 @@ function DamageHeartBurst({ burst }) {
 }
 
 function CardDetail({ card, onClose }) {
-  const hasGear = card.gear || card.tags?.includes('齿轮');
+  const hasGear = card.gear || card.tags?.includes('榻胯疆');
   return (
     <div className="detail-overlay" onClick={onClose}>
       <article className="detail-dialog" onClick={(event) => event.stopPropagation()}>
-        <button className="detail-close" onClick={onClose} aria-label="关闭">
+        <button className="detail-close" onClick={onClose} aria-label="鍏抽棴">
           <X size={18} />
         </button>
         <CardPreview card={card} />
         <section className="detail-copy">
           <div className="detail-title">
             <h2>{card.name}</h2>
-            <span>{CARD_TYPES[card.type]}{card.subType ? ` · ${card.subType}` : ''}</span>
+            <span>{CARD_TYPES[card.type]}{card.subType ? ` 路 ${card.subType}` : ''}</span>
           </div>
           <div className="detail-tags">
-            <span>消耗 {card.cost}</span>
-            {card.valueText && <span>污染 {card.valueText}</span>}
-            {isCharacterLike(card) && <span>{card.hp == null ? '特殊生命' : `${card.hp} 生命`}</span>}
-            {hasGear && <span>齿轮</span>}
+            <span>娑堣€?{card.cost}</span>
+            {card.valueText && <span>姹℃煋 {card.valueText}</span>}
+            {isCharacterLike(card) && <span>{card.hp == null ? '鐗规畩鐢熷懡' : `${card.hp} 鐢熷懡`}</span>}
+            {hasGear && <span>榻胯疆</span>}
           </div>
           <p>{card.text}</p>
           {card.notes && <small>{card.notes}</small>}
@@ -4267,20 +4687,21 @@ function CardDetail({ card, onClose }) {
   );
 }
 
-function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
+function TargetPicker({ card, enemy, enemies, actor, onCancel, onSelect }) {
+  const enemyList = enemies?.length ? enemies : [enemy].filter(Boolean);
   const effectText = targetEffectSummary(card, actor);
   const actorPhysicalDamage = actor ? (actor.actionDamage ?? actor.actionBodyDamage ?? actor.actionCharacterDamage ?? actor.atk ?? 0) : 0;
   const pureSpiritAction = Boolean(actor?.actionSpiritDamage && actorPhysicalDamage <= 0 && !actor.actionEffect);
   return (
     <div className="detail-overlay" onClick={onCancel}>
       <article className="target-dialog" onClick={(event) => event.stopPropagation()}>
-        <button className="detail-close" onClick={onCancel} aria-label="取消">
+        <button className="detail-close" onClick={onCancel} aria-label="cancel">
           <X size={18} />
         </button>
         <header className="target-header">
           <strong className="target-effect">{effectText}</strong>
           <h2>选择目标</h2>
-          <p>{actor ? `《${actor.name}》正在行动。` : `《${card.name}》需要选定目标。`}</p>
+          <p>{actor ? actor.name : card.name}</p>
         </header>
         <div className="target-grid">
           {actor?.actionShield ? (
@@ -4289,51 +4710,55 @@ function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
               <span>获得 {actor.actionShield} 点护盾</span>
             </button>
           ) : null}
-          {actor?.actionPolluteEnemy ? (
-            <button className="target-option support-target" onClick={() => onSelect({ type: 'polluteEnemy' })}>
-              <strong>污染敌方</strong>
-              <span>+{actor.actionPolluteEnemy} 污染</span>
-            </button>
-          ) : null}
           {actor?.actionSelfPolluteForSkill ? (
             <button className="target-option support-target" onClick={() => onSelect({ type: 'selfPolluteSkill' })}>
-              <strong>积蓄技能</strong>
+              <strong>技能点</strong>
               <span>自身+{actor.actionSelfPolluteForSkill}污染，+1技能点</span>
             </button>
           ) : null}
-          {actor?.actionSpiritDamage && !pureSpiritAction ? (
-            <button className="target-option support-target" onClick={() => onSelect({ type: 'spiritEnemy' })}>
-              <strong>削减精神</strong>
-              <span>-{actor.actionSpiritDamage} 精神力</span>
-            </button>
-          ) : null}
-          <button className="target-option body-target" onClick={() => onSelect(pureSpiritAction ? { type: 'spiritEnemy' } : { type: 'body' })}>
-            <strong>{enemy.label} 本体</strong>
-            <span>生命 {enemy.hp}</span>
-          </button>
-          {enemy.characters.map((character) => (
-            <React.Fragment key={character.instanceId}>
-              <button
-                className="target-option"
-                onClick={() => onSelect(pureSpiritAction ? { type: 'characterSpirit', instanceId: character.instanceId } : { type: 'character', instanceId: character.instanceId })}
-              >
-                <CardArt card={character} className="target-art" />
-                <strong>{character.name}</strong>
-                <span>{character.currentHp == null ? '特殊' : `${character.currentHp} 血`}</span>
-              </button>
+          {enemyList.map((enemyItem) => (
+            <React.Fragment key={enemyItem.id}>
+              {actor?.actionPolluteEnemy ? (
+                <button className="target-option support-target" onClick={() => onSelect({ type: 'polluteEnemy', enemyId: enemyItem.id })}>
+                  <strong>{enemyItem.label}</strong>
+                  <span>+{actor.actionPolluteEnemy} 污染</span>
+                </button>
+              ) : null}
               {actor?.actionSpiritDamage && !pureSpiritAction ? (
-                <button
-                  className="target-option support-target"
-                  onClick={() => onSelect({ type: 'characterSpirit', instanceId: character.instanceId })}
-                >
-                  <CardArt card={character} className="target-art" />
-                  <strong>{character.name}</strong>
+                <button className="target-option support-target" onClick={() => onSelect({ type: 'spiritEnemy', enemyId: enemyItem.id })}>
+                  <strong>{enemyItem.label}</strong>
                   <span>-{actor.actionSpiritDamage} 精神力</span>
                 </button>
               ) : null}
+              <button className="target-option body-target" onClick={() => onSelect(pureSpiritAction ? { type: 'spiritEnemy', enemyId: enemyItem.id } : { type: 'body', enemyId: enemyItem.id })}>
+                <strong>{enemyItem.label} 本体</strong>
+                <span>生命 {enemyItem.hp}</span>
+              </button>
+              {enemyItem.characters.map((character) => (
+                <React.Fragment key={character.instanceId}>
+                  <button
+                    className="target-option"
+                    onClick={() => onSelect(pureSpiritAction ? { type: 'characterSpirit', enemyId: enemyItem.id, instanceId: character.instanceId } : { type: 'character', enemyId: enemyItem.id, instanceId: character.instanceId })}
+                  >
+                    <CardArt card={character} className="target-art" />
+                    <strong>{enemyItem.label} - {character.name}</strong>
+                    <span>{character.currentHp == null ? '特殊' : String(character.currentHp) + ' 血'}</span>
+                  </button>
+                  {actor?.actionSpiritDamage && !pureSpiritAction ? (
+                    <button
+                      className="target-option support-target"
+                      onClick={() => onSelect({ type: 'characterSpirit', enemyId: enemyItem.id, instanceId: character.instanceId })}
+                    >
+                      <CardArt card={character} className="target-art" />
+                      <strong>{enemyItem.label} - {character.name}</strong>
+                      <span>-{actor.actionSpiritDamage} 精神力</span>
+                    </button>
+                  ) : null}
+                </React.Fragment>
+              ))}
             </React.Fragment>
           ))}
-          {enemy.characters.length === 0 && (
+          {enemyList.every((enemyItem) => enemyItem.characters.length === 0) && (
             <div className="target-empty">敌方没有明置角色</div>
           )}
         </div>
@@ -4344,9 +4769,9 @@ function TargetPicker({ card, enemy, actor, onCancel, onSelect }) {
 
 function WordlessBookPicker({ card, onCancel, onSelect }) {
   const options = [
-    { option: 'resetPollution', title: '重置污染', text: '污染变为0，生命上限-5。' },
-    { option: 'heal', title: '恢复生命', text: '本体+50血，生命上限-5。' },
-    { option: 'spirit', title: '恢复精神', text: '本体+40精神力，生命上限-5。' },
+    { option: 'resetPollution', title: '閲嶇疆姹℃煋', text: '姹℃煋鍙樹负0锛岀敓鍛戒笂闄?5銆? '},
+    { option: 'heal', title: '鎭㈠鐢熷懡', text: '鏈綋+50琛€锛岀敓鍛戒笂闄?5銆? '},
+    { option: 'spirit', title: '鎭㈠绮剧', text: '鏈綋+40绮剧鍔涳紝鐢熷懡涓婇檺-5銆? '},
   ];
   return (
     <div className="detail-overlay" onClick={onCancel}>
@@ -4453,7 +4878,7 @@ function CyclePicker({ hand, onCancel, onSelect }) {
 }
 
 function CardPreview({ card }) {
-  const hasGear = card.gear || card.tags?.includes('齿轮');
+  const hasGear = card.gear || card.tags?.includes('榻胯疆');
   return (
     <div
       className={`card-mini card-preview framed-card ${card.type}`}

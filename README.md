@@ -24,13 +24,13 @@ npm run build
 
 Run these commands in this project folder: `d:\Desktop\choujiang\兵棋`.
 
-Default LAN server port:
+Default relay server port:
 
 ```powershell
-npm run lan
+npm run relay:18781
 ```
 
-Explicit default port:
+Legacy LAN port:
 
 ```powershell
 npm run lan:8781
@@ -39,38 +39,37 @@ npm run lan:8781
 Custom port:
 
 ```powershell
-npm run lan -- --port 9000
+npm run relay -- --port 9000
 ```
 
-or:
-
-```powershell
-npm run lan:port -- 9000
-```
-
-After the server starts, it prints one or more phone URLs like:
+After the server starts, it prints one or more URLs like:
 
 ```text
-Phone WebSocket URL: ws://192.168.1.23:8781
+LAN WebSocket URL: ws://192.168.1.23:18781
 ```
 
-On both phones, choose LAN mode, enter the same WebSocket URL and the same room name such as `room1`.
+On both phones, choose server mode or LAN mode, enter the same WebSocket URL and the same room name such as `room1`.
 
-For public access, expose the same TCP port with your router, tunnel, or cloud relay, then enter:
+For the APK, use the direct public relay on port `18781`.
+
+Example public address:
 
 ```text
-ws://PUBLIC_HOST:PORT
+ws://duoduo1215.xyz:18781
 ```
-
-Use `wss://` only if your public relay provides TLS WebSocket support.
 
 ## Checks
 
 ```powershell
 npm run audit:cards
 npm run audit:behavior
+npm run check:encoding
 npm run build
 ```
+
+## Encoding
+
+All source files should be saved as UTF-8 without BOM. The project includes `.editorconfig`, `.gitattributes`, VS Code settings, and `npm run check:encoding` to prevent new mojibake from entering the codebase.
 
 ## GitHub Release Updates
 
@@ -116,14 +115,4 @@ Plain text responses containing only the audio URL are supported too.
 ## Developer Cards
 
 Settings -> Developer Mode shows every built-in card and saved custom card.
-Custom card code is JSON. A quick example:
-
-```json
-{"effect":"healSelf","value":15,"cost":1,"valueText":"+0","text":"我方本体+15血。"}
-```
-
-The project-local Codex skill for writing and checking custom card code is here:
-
-```text
-.codex/skills/card-code-skill/SKILL.md
-```
+Custom card code is JSON.

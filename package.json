@@ -9,9 +9,13 @@
     "preview": "vite preview --host 0.0.0.0",
     "screenshot": "node scripts/screenshot-ui.mjs",
     "gen:image": "node scripts/generate-sensenova-image.mjs",
+    "check:encoding": "node scripts/check-encoding.mjs",
+    "check:encoding:update": "node scripts/check-encoding.mjs --update-baseline",
     "audit:cards": "node scripts/audit-objective-cards.mjs",
     "audit:behavior": "node scripts/audit-objective-behavior.mjs",
     "lan": "node scripts/lan-server.mjs",
+    "relay": "node scripts/lan-server.mjs",
+    "relay:18781": "node scripts/lan-server.mjs --port 18781",
     "lan:8781": "node scripts/lan-server.mjs --port 8781",
     "lan:port": "node scripts/lan-server.mjs --port"
   },
