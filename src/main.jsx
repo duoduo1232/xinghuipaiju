@@ -3915,9 +3915,11 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
             <datalist id="proxy-presets">
               <option value="">直连（不加速）</option>
               <option value="https://ghproxy.cxkpro.top" />
-              <option value="https://ghp.ci" />
-              <option value="https://mirror.ghproxy.com" />
-              <option value="https://gh.ddlc.top" />
+              <option value="https://gh-proxy.com" />
+              <option value="https://gitproxy.mrhjx.cn" />
+              <option value="https://ghproxy.imciel.com" />
+              <option value="https://gh.idayer.com" />
+              <option value="https://github.ednovas.xyz" />
             </datalist>
             <section className={`update-panel ${updateState.status}`}>
               <div className="update-version-row">
