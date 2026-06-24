@@ -3907,10 +3907,18 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
             <label htmlFor="update-proxy">更新加速节点</label>
             <input
               id="update-proxy"
+              list="proxy-presets"
               value={draftSettings.updateProxy ?? DEFAULT_UPDATE_PROXY}
               onChange={(event) => setDraftSettings((current) => ({ ...current, updateProxy: event.target.value }))}
-              placeholder={DEFAULT_UPDATE_PROXY}
+              placeholder="留空则直连"
             />
+            <datalist id="proxy-presets">
+              <option value="">直连（不加速）</option>
+              <option value="https://ghproxy.cxkpro.top" />
+              <option value="https://ghp.ci" />
+              <option value="https://mirror.ghproxy.com" />
+              <option value="https://gh.ddlc.top" />
+            </datalist>
             <section className={`update-panel ${updateState.status}`}>
               <div className="update-version-row">
                 <span>当前版本</span>
