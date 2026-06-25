@@ -1232,7 +1232,8 @@ button:not(:disabled) {
 
 .meter-track,
 .pollution-track {
-  height: 12px;
+  position: relative;
+  height: 14px;
   overflow: hidden;
   border: 2px solid rgba(108, 136, 176, 0.5);
   border-radius: 999px;
@@ -1240,10 +1241,28 @@ button:not(:disabled) {
   box-shadow: inset 0 2px 2px rgba(0, 0, 0, 0.48);
 }
 
+/* 像素分段刻度，让进度条更有“游戏数值”质感 */
+.meter-track::after,
+.pollution-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.16) 0,
+    rgba(0, 0, 0, 0.16) 1px,
+    transparent 1px,
+    transparent 10%
+  );
+  border-radius: inherit;
+}
+
 .meter-fill,
 .pollution-fill {
   height: 100%;
   border-radius: inherit;
+  transition: width 0.42s cubic-bezier(0.22, 0.8, 0.28, 1);
 }
 
 .meter-life .meter-fill {
@@ -1522,6 +1541,23 @@ button:not(:disabled) {
   filter: brightness(1.05);
 }
 
+/* 像素实体按键的按压反馈：下沉 + 压扁底部阴影 */
+.primary-action:active,
+.mini-action:active,
+.icon-button:active,
+.coin-button:active,
+.top-tool-button:active,
+.switcher button:active,
+.detail-close:active,
+.inspect-card:active {
+  transform: translateY(2px);
+  filter: brightness(0.97);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -2px 0 rgba(77, 96, 120, 0.12),
+    0 1px 0 rgba(79, 92, 118, 0.18);
+}
+
 .unit-art {
   overflow: hidden;
   border-radius: 12px;
@@ -1673,7 +1709,6 @@ button:not(:disabled) {
   justify-items: center;
   margin-left: 0;
   transform-origin: bottom center;
-  transform: scale(var(--hand-card-scale, 1));
   transition: transform 120ms ease, filter 120ms ease;
 }
 
@@ -1683,12 +1718,12 @@ button:not(:disabled) {
 
 .hand-card-wrap:hover {
   z-index: 12012;
-  transform: translateY(-16px) scale(calc(var(--hand-card-scale, 1) * 1.08));
+  transform: translateY(-16px) scale(1.08);
 }
 
 .hand-card-wrap.selected {
   z-index: 12013;
-  transform: translateY(-26px) scale(calc(var(--hand-card-scale, 1) * 1.16));
+  transform: translateY(-26px) scale(1.16);
 }
 
 .hand-card-wrap.selected .card-mini {
@@ -1742,8 +1777,8 @@ button:not(:disabled) {
 }
 
 .card-mini {
-  width: 136px;
-  height: 181px;
+  width: calc(136px * var(--hand-card-scale, 1));
+  height: calc(181px * var(--hand-card-scale, 1));
   position: relative;
   overflow: hidden;
   padding: 0;
@@ -2104,6 +2139,21 @@ button:not(:disabled) {
   width: 138px;
   height: 183px;
   filter: drop-shadow(0 16px 18px rgba(47, 66, 93, 0.32));
+}
+
+.play-card-copy.hidden-burst {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.play-card-back {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  border-radius: 12px;
 }
 
 .play-card-burst > strong {

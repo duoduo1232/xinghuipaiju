@@ -3250,7 +3250,8 @@ function App() {
           }, { sync: false });
           return;
         }
-        setPlayFx({ card: preview.card, id: `ai-${Date.now()}` });
+        const previewHidden = isHiddenLike(preview.card) || preview.card?.id === 'char_protector';
+        setPlayFx({ card: preview.card, hidden: previewHidden, id: `ai-${Date.now()}` });
         window.setTimeout(() => {
           updateGame((current) => runAiStep(current, currentPlayer, { allowCycle: false }).game, { sync: false });
           setPlayFx(null);
@@ -3491,7 +3492,7 @@ function App() {
           />
         )}
 
-        {playFx && <PlayCardBurst key={playFx.id} card={playFx.card} />}
+        {playFx && <PlayCardBurst key={playFx.id} card={playFx.card} hidden={playFx.hidden} />}
         {damageBursts.map((burst) => (
           <DamageHeartBurst key={burst.id} burst={burst} />
         ))}
@@ -4765,8 +4766,6 @@ function CardMini({ card, disabled, disabledReason = '', selected = false, onCli
               <Cog size={13} />
             </span>
         )}
-        <p className="frame-text">{card.text}</p>
-        <small className="frame-type">{CARD_TYPES[card.type]}</small>
         {isCharacterLike(card) && (
           <em className="frame-stats">
             {card.atk} 攻 / {card.hp == null ? '特殊' : `${card.hp} 血`}
@@ -4803,8 +4802,18 @@ function targetEffectSummary(card, actor) {
   return card.text ?? '选择目标';
 }
 
-function PlayCardBurst({ card }) {
+function PlayCardBurst({ card, hidden = false }) {
   const hasGear = card.gear || card.tags?.includes('齿轮');
+  if (hidden) {
+    return (
+      <div className="play-card-burst" aria-hidden="true">
+        <div className="card-mini play-card-copy framed-card hidden-burst">
+          <img className="play-card-back" src={cardBackUrl} alt="" />
+        </div>
+        <strong>暗置</strong>
+      </div>
+    );
+  }
   return (
     <div className="play-card-burst" aria-hidden="true">
       <div
