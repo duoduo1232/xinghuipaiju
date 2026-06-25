@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ChevronLeft, ChevronRight, Cog, Coins, Download, Eye, Info, Play, RefreshCw, RotateCcw, Shield, Swords, X, Zap } from 'lucide-react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import packageInfo from '../package.json';
 import cardFrameUrl from '../1.png';
 import cardBackUrl from './assets/card-back.png';
@@ -211,6 +212,58 @@ const DEFAULT_PLAYER_NAME = '玩家';
 const PLAYER_NAME_KEY = 'pixel-card-player-name';
 const PLAYER_STATS_KEY = 'pixel-card-player-stats';
 const PLAYER_SETTINGS_KEY = 'pixel-card-settings';
+const STORAGE_KEYS = [PLAYER_NAME_KEY, PLAYER_STATS_KEY, PLAYER_SETTINGS_KEY];
+
+// 源无关存储层：以同步内存缓存为真相源，底层用 Capacitor Preferences 持久化
+// （原生 SharedPreferences，不受 web origin 影响——androidScheme 改了也不丢）。
+// 启动时 initStorage() 把 Preferences 读进缓存，并从 localStorage 迁移历史数据。
+// 同步接口 storageGet/storageSet 保持与旧 localStorage 用法一致，调用点无需改成异步。
+const storageCache = new Map();
+
+function storageGet(key) {
+  if (storageCache.has(key)) return storageCache.get(key);
+  // 缓存未命中（如 initStorage 尚未完成）时回退读 localStorage，保证首屏不空白
+  try {
+    const v = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+    storageCache.set(key, v);
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key, value) {
+  storageCache.set(key, value);
+  // 同步落 localStorage（即时、网页版兜底），异步落 Preferences（原生持久化）
+  try {
+    if (typeof window !== 'undefined') window.localStorage.setItem(key, value);
+  } catch { /* ignore quota / unavailable */ }
+  try {
+    Preferences.set({ key, value }).catch(() => {});
+  } catch { /* plugin unavailable on web is fine */ }
+}
+
+async function initStorage() {
+  for (const key of STORAGE_KEYS) {
+    let value = null;
+    try {
+      const res = await Preferences.get({ key });
+      value = res?.value ?? null;
+    } catch { /* web/无插件时忽略 */ }
+    // Preferences 没有 → 从当前源的 localStorage 迁移（首次升级到本版时）
+    if (value == null && typeof window !== 'undefined') {
+      try {
+        const legacy = window.localStorage.getItem(key);
+        if (legacy != null) {
+          value = legacy;
+          try { await Preferences.set({ key, value }); } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    }
+    storageCache.set(key, value);
+  }
+}
+
 
 const DEFAULT_SETTINGS = {
   musicEnabled: false,
@@ -295,7 +348,7 @@ const CUSTOM_CARD_CODE_EXAMPLES = [
 function getStoredStats() {
   if (typeof window === 'undefined') return { wins: 0, losses: 0 };
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PLAYER_STATS_KEY) || '{}');
+    const parsed = JSON.parse(storageGet(PLAYER_STATS_KEY) || '{}');
     return {
       wins: Number.isFinite(parsed.wins) ? parsed.wins : 0,
       losses: Number.isFinite(parsed.losses) ? parsed.losses : 0,
@@ -306,7 +359,7 @@ function getStoredStats() {
 }
 
 function saveStats(stats) {
-  window.localStorage.setItem(PLAYER_STATS_KEY, JSON.stringify(stats));
+  storageSet(PLAYER_STATS_KEY, JSON.stringify(stats));
 }
 
 async function fetchLeaderboard(signal) {
@@ -329,7 +382,7 @@ async function submitLeaderboardResult({ name, result, mode }) {
 function getStoredSettings() {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PLAYER_SETTINGS_KEY) || '{}');
+    const parsed = JSON.parse(storageGet(PLAYER_SETTINGS_KEY) || '{}');
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
@@ -352,7 +405,7 @@ function getStoredSettings() {
 }
 
 function saveSettings(settings) {
-  window.localStorage.setItem(PLAYER_SETTINGS_KEY, JSON.stringify(settings));
+  storageSet(PLAYER_SETTINGS_KEY, JSON.stringify(settings));
 }
 
 function normalizeVersion(version = '') {
@@ -465,7 +518,7 @@ async function checkGitHubUpdate(repo, signal) {
 
 function getStoredPlayerName() {
   if (typeof window === 'undefined') return DEFAULT_PLAYER_NAME;
-  return window.localStorage.getItem(PLAYER_NAME_KEY)?.trim() || DEFAULT_PLAYER_NAME;
+  return storageGet(PLAYER_NAME_KEY)?.trim() || DEFAULT_PLAYER_NAME;
 }
 
 function getAutoStartMode() {
@@ -2706,7 +2759,7 @@ function App() {
   function applyLocalPlayerName(nextName) {
     const cleaned = nextName.trim().slice(0, 10) || DEFAULT_PLAYER_NAME;
     setPlayerName(cleaned);
-    window.localStorage.setItem(PLAYER_NAME_KEY, cleaned);
+    storageSet(PLAYER_NAME_KEY, cleaned);
     setGame((current) => {
       const nextGame = structuredClone(current);
       const seat = isRelayNetworkMode(mode) ? localSeat : 'p1';
@@ -3344,6 +3397,23 @@ function App() {
           setStats(nextStats);
           saveStats(nextStats);
         }}
+        onImportSave={(payload) => {
+          // payload: { name, stats, settings } — 任意字段可缺省
+          if (payload.name) applyLocalPlayerName(payload.name);
+          if (payload.stats) {
+            const nextStats = {
+              wins: Number.isFinite(payload.stats.wins) ? payload.stats.wins : 0,
+              losses: Number.isFinite(payload.stats.losses) ? payload.stats.losses : 0,
+            };
+            setStats(nextStats);
+            saveStats(nextStats);
+          }
+          if (payload.settings && typeof payload.settings === 'object') {
+            const merged = { ...DEFAULT_SETTINGS, ...payload.settings };
+            setSettings(merged);
+            saveSettings(merged);
+          }
+        }}
         onStart={startGame}
       />
     );
@@ -3670,7 +3740,7 @@ function App() {
   );
 }
 
-function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChange, onResetStats, onStart }) {
+function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChange, onResetStats, onImportSave, onStart }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draftName, setDraftName] = useState(playerName);
   const [draftSettings, setDraftSettings] = useState(settings);
@@ -3680,6 +3750,9 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
   const [updateProgress, setUpdateProgress] = useState(0);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [leaderboardState, setLeaderboardState] = useState({ status: 'idle', players: [], message: '' });
+  const [saveCodeOpen, setSaveCodeOpen] = useState(false);
+  const [saveCodeText, setSaveCodeText] = useState('');
+  const [saveCodeMsg, setSaveCodeMsg] = useState('');
 
   useEffect(() => {
     setDraftName(playerName);
@@ -3724,6 +3797,51 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       updateProxy: normalizeUpdateProxy(draftSettings.updateProxy),
     });
     setSettingsOpen(false);
+  }
+
+  function handleExportSave() {
+    // 把当前名字/胜负/设置打包成一段可复制的存档码（base64，兼容中文）
+    const payload = {
+      v: 1,
+      name: draftName,
+      stats,
+      settings: draftSettings,
+    };
+    try {
+      const code = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      setSaveCodeText(code);
+      setSaveCodeOpen(true);
+      setSaveCodeMsg('已生成存档码，复制保存即可。');
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(code).then(
+          () => setSaveCodeMsg('存档码已复制到剪贴板，请妥善保存。'),
+          () => {},
+        );
+      }
+    } catch {
+      setSaveCodeMsg('生成存档码失败。');
+      setSaveCodeOpen(true);
+    }
+  }
+
+  function handleImportSave() {
+    const raw = saveCodeText.trim();
+    if (!raw) {
+      setSaveCodeMsg('请先粘贴存档码。');
+      return;
+    }
+    try {
+      const json = decodeURIComponent(escape(atob(raw)));
+      const payload = JSON.parse(json);
+      onImportSave({
+        name: typeof payload.name === 'string' ? payload.name : undefined,
+        stats: payload.stats,
+        settings: payload.settings,
+      });
+      setSaveCodeMsg('存档已导入。');
+    } catch {
+      setSaveCodeMsg('存档码无效，无法导入。');
+    }
   }
 
   async function handleCheckUpdate() {
@@ -3891,6 +4009,26 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
               <button type="button" className="mini-action" onClick={() => setSettingsOpen(false)}>取消</button>
             </div>
             <button type="button" className="mini-action" onClick={onResetStats}>重置胜负统计</button>
+            <div className="save-code-actions">
+              <button type="button" className="mini-action" onClick={handleExportSave}>导出存档</button>
+              <button type="button" className="mini-action" onClick={() => { setSaveCodeOpen((open) => !open); setSaveCodeMsg(''); }}>
+                {saveCodeOpen ? '收起存档码' : '导入存档'}
+              </button>
+            </div>
+            {saveCodeOpen && (
+              <div className="save-code-panel">
+                <textarea
+                  value={saveCodeText}
+                  onChange={(event) => setSaveCodeText(event.target.value)}
+                  placeholder="粘贴存档码后点“导入此存档”，或点“导出存档”生成当前存档码"
+                  rows={3}
+                />
+                <div className="save-code-buttons">
+                  <button type="button" className="primary-action" onClick={handleImportSave}>导入此存档</button>
+                </div>
+                {saveCodeMsg ? <p className="save-code-msg">{saveCodeMsg}</p> : null}
+              </div>
+            )}
             <label htmlFor="ui-scale">界面大小 1-300%</label>
             <input
               id="ui-scale"
@@ -4963,5 +5101,8 @@ export {
 };
 
 if (typeof document !== 'undefined') {
-  createRoot(document.getElementById('root')).render(<App />);
+  const mount = () => createRoot(document.getElementById('root')).render(<App />);
+  // 先把持久化数据读进同步缓存（含 localStorage→Preferences 迁移），再渲染，
+  // 保证首屏就能拿到名字/胜负/设置。Preferences 不可用（网页版）时也照常渲染。
+  initStorage().then(mount, mount);
 }

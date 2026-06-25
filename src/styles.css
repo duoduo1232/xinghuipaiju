@@ -321,6 +321,44 @@ button:not(:disabled) {
   background: rgba(255, 242, 240, 0.88);
 }
 
+.save-code-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.save-code-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid rgba(108, 136, 176, 0.32);
+  border-radius: 12px;
+  background: rgba(245, 249, 255, 0.82);
+}
+
+.save-code-panel textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 8px 10px;
+  color: #30425d;
+  border: 2px solid rgba(108, 136, 176, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  word-break: break-all;
+}
+
+.save-code-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.save-code-msg {
+  margin: 0;
+  color: #2f6f45;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .developer-panel {
   display: grid;
   gap: 10px;

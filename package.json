@@ -1,6 +1,6 @@
 {
   "name": "pixel-card-duel",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "@capacitor/android": "^8.4.0",
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
+    "@capacitor/preferences": "^8.0.1",
     "@vitejs/plugin-react": "^5.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
