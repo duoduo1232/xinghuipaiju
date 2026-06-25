@@ -196,7 +196,7 @@ function addSkill(player, amount) {
   player.skill = Math.min(MAX_SKILL, Math.max(0, (player.skill ?? 0) + amount));
 }
 
-const DEFAULT_PLAYER_NAME = '鐜╁';
+const DEFAULT_PLAYER_NAME = '玩家';
 const PLAYER_NAME_KEY = 'pixel-card-player-name';
 const PLAYER_STATS_KEY = 'pixel-card-player-stats';
 const PLAYER_SETTINGS_KEY = 'pixel-card-settings';
@@ -262,7 +262,7 @@ const CUSTOM_CARD_SKILL_FIELDS = [
   '特殊 effect：teleport 传送，wordlessBook 无字天书，feedingContract 投喂契约，rewindClock 回溯之钟，selfDestruct 自毁装置。',
   '角色字段：hp 血量，spirit 精神力，atk 展示攻击，noSpirit true 表示没有精神力。',
   '行动字段：actionCount 行动次数，actionDamage 物伤，actionShield 自身护盾，actionSkillCost 行动消耗技能点。',
-  '暗置：type 写 hidden，subType 写 character / equipment / scene / skill，会占对应槽位。',
+  '暗置：type 为 hidden，subType 为 character / equipment / scene / skill，会占对应槽位。',
   '标记：gear true 或 tags 包含 "齿轮" 会被传送等齿轮相关效果识别。',
   'text：卡牌说明文字，会显示在卡牌和详情页。',
 ];
@@ -301,7 +301,7 @@ function saveStats(stats) {
 async function fetchLeaderboard(signal) {
   if (!DEFAULT_LEADERBOARD_URL) return [];
   const response = await fetch(DEFAULT_LEADERBOARD_URL, { signal });
-  if (!response.ok) throw new Error(`鎺掕姒滆鍙栧け璐ワ細${response.status}`);
+  if (!response.ok) throw new Error(`排行榜读取失败：${response.status}`);
   const data = await response.json();
   return Array.isArray(data.players) ? data.players : [];
 }
@@ -498,11 +498,11 @@ function getSeatLabels(mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat 
     return {
       p1: name,
       p2: 'Bot',
-      p3: mode === 'team4' ? 'AI 闃熷弸' : 'Bot',
+      p3: mode === 'team4' ? 'AI 队友' : 'Bot',
       p4: 'Bot',
     };
   }
-  return { p1: name, p2: '瀵规墜' };
+  return { p1: name, p2: '对手' };
 }
 
 function setupGame({ mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 'p1', customCards = [] } = {}) {
@@ -1143,7 +1143,7 @@ function runAiStep(game, playerId, { allowCycle = true } = {}) {
     const target = chooseActionTarget(game, playerId, actor);
     if (!target) {
       return {
-        game: advanceActionCursor(game, `${game.players[playerId].label}璺宠繃浜嗐€?{actor.name}銆嬬殑琛屽姩銆俙`),
+        game: advanceActionCursor(game, `${game.players[playerId].label}跳过了《${actor.name}》的行动。`),
         playedCard: null,
         advanced: false,
         cycled: false,
@@ -1152,7 +1152,7 @@ function runAiStep(game, playerId, { allowCycle = true } = {}) {
     const nextState = resolveCharacterAction(game, playerId, actor.instanceId, target);
     if (nextState === game) {
       return {
-        game: advanceActionCursor(game, `${game.players[playerId].label}鏃犳硶瀹屾垚銆?{actor.name}銆嬬殑琛屽姩銆俙`),
+        game: advanceActionCursor(game, `${game.players[playerId].label}无法完成《${actor.name}》的行动。`),
         playedCard: null,
         advanced: false,
         cycled: false,
@@ -1168,10 +1168,10 @@ function phaseLabel(game) {
   const [playerId, step] = game.phase.split(':');
   const name = game.players[playerId].label;
   const stepName = {
-    play: '鍑虹墝',
-    action: '瑙掕壊琛屽姩',
+    play: '出牌',
+    action: '角色行动',
   }[step];
-  return `${name} 路 ${stepName}`;
+  return `${name} · ${stepName}`;
 }
 
 function nextPhase(game) {
@@ -1290,10 +1290,10 @@ function drawRoundCards(players, sharedDeck = null) {
       const drawLimit = Math.max(0, Math.min(TURN_DRAW_COUNT, HAND_LIMIT - player.hand.length));
       const recycled = sharedDeck.length === 0 ? recycleSharedDeck(sharedDeck, players) : 0;
       const drawn = drawFromSharedDeck(player, TURN_DRAW_COUNT, sharedDeck, players);
-      if (recycled > 0) logs.push(`鍏叡鐗屽簱鎽哥┖锛屽皢${recycled}寮犲純鐗屾礂鍥炵墝搴撱€俙`);
-      if (drawn > 0) logs.push(`${player.label}琛ユ懜${drawn}寮犵墝銆俙`);
-      if (drawLimit === 0) logs.push(`${player.label}鎵嬬墝宸叉弧锛屼笉鑳界户缁懜鐗屻€俙`);
-      if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}娌℃湁鎽稿埌鐗屻€俙`);
+      if (recycled > 0) logs.push(`公共牌库摸空，将${recycled}张弃牌洗回牌库。`);
+      if (drawn > 0) logs.push(`${player.label}补摸${drawn}张牌。`);
+      if (drawLimit === 0) logs.push(`${player.label}手牌已满，不能继续摸牌。`);
+      if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}没有摸到牌。`);
       return;
     }
     let drawn = 0;
@@ -1310,10 +1310,10 @@ function drawRoundCards(players, sharedDeck = null) {
       player.hand.push(player.deck.shift());
       drawn += 1;
     }
-    if (recycled > 0) logs.push(`${player.label}鐗屽簱鎽哥┖锛屽皢${recycled}寮犲純鐗屾礂鍥炵墝搴撱€俙`);
-    if (drawn > 0) logs.push(`${player.label}琛ユ懜${drawn}寮犵墝銆俙`);
-    if (drawLimit === 0) logs.push(`${player.label}鎵嬬墝宸叉弧锛屼笉鑳界户缁懜鐗屻€俙`);
-    if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}娌℃湁鎽稿埌鐗屻€俙`);
+    if (recycled > 0) logs.push(`${player.label}牌库摸空，将${recycled}张弃牌洗回牌库。`);
+    if (drawn > 0) logs.push(`${player.label}补摸${drawn}张牌。`);
+    if (drawLimit === 0) logs.push(`${player.label}手牌已满，不能继续摸牌。`);
+    if (drawn === 0 && drawLimit > 0) logs.push(`${player.label}没有摸到牌。`);
   });
   return logs;
 }
@@ -1380,7 +1380,7 @@ function applyPollutionChange(player, delta) {
       player.discard.push(blessing);
       player.pollutionImmuneThisRound = true;
       player.cannotPlayThisRound = true;
-      logs.push(`${player.label}鐨勩€婄涓婄殑搴囨姢銆嬭Е鍙戯紝鏈洖鍚堜笉鍙楁薄鏌撲笖涓嶅彲鍑虹墝銆俙`);
+      logs.push(`${player.label}的《祖上的庇护》触发，本回合不受污染且不可出牌。`);
       return logs;
     }
   }
@@ -1410,14 +1410,14 @@ function runRoundStartEffects(players) {
       Object.values(players).forEach((player) => {
         logs.push(...applyBodySpiritDamage(player, 2));
       });
-      logs.push('淇″彿濉旇Е鍙戯紝鍙屾柟鏈綋-2绮剧鍔涖€?');
+      logs.push('信号塔触发，双方本体-2精神力。');
     }
     if (hasEquipment(owner, 'scene_vending_machine')) {
       logs.push(...applyPollutionChange(owner, 10));
       addSkill(owner, 1);
       logs.push(...applyPollutionChange(enemy, 15));
       addSkill(enemy, 1);
-      logs.push(`${owner.label}鐨勮穿鍗栨満瑙﹀彂锛氬繁鏂?10姹℃煋+1鎶€鑳界偣锛屽鏂?15姹℃煋+1鎶€鑳界偣銆俙`);
+      logs.push(`${owner.label}的贩卖机触发：己方+10污染+1技能点，对方+15污染+1技能点。`);
     }
     if (hasEquipment(owner, 'scene_darkness')) {
       Object.values(players).forEach((player) => {
@@ -1426,7 +1426,7 @@ function runRoundStartEffects(players) {
       });
       enemy.hp = clampHp(enemy.hp - 5);
       logs.push(...applyPollutionChange(enemy, 5));
-      logs.push(`${owner.label}鐨勯粦鏆楋紒瑙﹀彂锛氬叏鍛?5绮剧鍔?10姹℃煋锛?{enemy.label}棰濆-5琛€+5姹℃煋銆俙`);
+      logs.push(`${owner.label}的黑暗！触发：全员+5精神力+10污染，${enemy.label}额外-5血+5污染。`);
     }
   });
   return logs;
@@ -1438,7 +1438,7 @@ function runRoundEndEffects(players, currentTurn = null) {
     if (hasEquipment(player, 'scene_banquet')) {
       allBoardCharacters(player).forEach((character) => changeCharacterHp(character, 1));
       healPlayer(player, 4);
-      logs.push(`${player.label}鐨勫甯Е鍙戯細宸辨柟瑙掕壊+1琛€锛屾湰浣?4琛€銆俙`);
+      logs.push(`${player.label}的宴席触发：己方角色+1血，本体+4血。`);
     }
 
     const mountain = [...(player.scenes ?? []), ...player.hidden].find((card) => card.id === 'scene_mountain');
@@ -1453,7 +1453,7 @@ function runRoundEndEffects(players, currentTurn = null) {
       logs.push(...applyPollutionChange(player, -4));
       mountain.triggerCount = (mountain.triggerCount ?? 0) + 1;
       if (currentTurn != null) mountain.lastTriggeredTurn = currentTurn;
-      logs.push(`${player.label}鐨勫畝瑙﹀彂锛氬繁鏂硅鑹?1琛€+1绮剧鍔涳紝鏈綋+3琛€+3绮剧鍔涳紝姹℃煋-4銆傦紙${mountain.triggerCount}/${mountain.maxTriggers ?? 3}锛塦`);
+      logs.push(`${player.label}的宀触发：己方角色+1血+1精神力，本体+3血+3精神力，污染-4。（${mountain.triggerCount}/${mountain.maxTriggers ?? 3}）`);
     }
 
     allBoardCharacters(player).forEach((character) => {
@@ -1529,7 +1529,7 @@ function hasEquipment(player, id) {
 
 function isGearCard(card) {
   return Boolean(card.gear)
-    || card.tags?.includes('榻胯疆')
+    || card.tags?.includes('齿轮')
     || [
       'skill_transfer',
       'skill_memory_inspect',
@@ -1616,16 +1616,16 @@ function applyWordlessBookEffect(player, option, logs = []) {
   reduceMaxHp(player, 5);
   if (option === 'resetPollution') {
     player.pollution = 0;
-    logs.push(`${player.label}閫夋嫨銆婃棤瀛楀ぉ涔︺€嬶細姹℃煋閲嶇疆鍒?锛岀敓鍛戒笂闄?5銆俙`);
+    logs.push(`${player.label}选择《无字天书》：污染重置到0，生命上限-5。`);
     return logs;
   }
   if (option === 'heal') {
     healPlayer(player, 50);
-    logs.push(`${player.label}閫夋嫨銆婃棤瀛楀ぉ涔︺€嬶細鏈綋+50琛€锛岀敓鍛戒笂闄?5銆俙`);
+    logs.push(`${player.label}选择《无字天书》：本体+50血，生命上限-5。`);
     return logs;
   }
   logs.push(...applyBodySpiritHeal(player, 40));
-  logs.push(`${player.label}閫夋嫨銆婃棤瀛楀ぉ涔︺€嬶細鏈綋+40绮剧鍔涳紝鐢熷懡涓婇檺-5銆俙`);
+    logs.push(`${player.label}选择《无字天书》：本体+40精神力，生命上限-5。`);
   return logs;
 }
 
@@ -1664,7 +1664,7 @@ function restoreRewindSnapshot(player, logs = []) {
   Object.assign(player, snapshot);
   delete player.rewindSnapshot;
   delete player.rewindUntilTurn;
-  logs.push(`${player.label}鐨勫洖鏈斾箣閽熻Е鍙戯紝鎭㈠鍒拌褰曟椂鐨勬暟鎹€俙`);
+    logs.push(`${player.label}的回朔之钟触发，恢复到记录时的数据。`);
   return true;
 }
 
@@ -1682,7 +1682,7 @@ function triggerMetalCabinetIfAttack(defender, card, logs = []) {
   const [metalCabinet] = defender.hidden.splice(index, 1);
   defender.discard.push(metalCabinet);
   defender.physicalImmuneThisRound = true;
-  logs.push(`${defender.label}鐨勩€婇噾灞炴煖銆嬭Е鍙戯紝鏈洖鍚堜笉鍙楃墿浼ゃ€俙`);
+    logs.push(`${defender.label}的《金属柜》触发，本回合不受物伤。`);
   return true;
 }
 
@@ -1711,10 +1711,10 @@ function applyBodyDamage(player, amount, type = 'physical') {
 function applyCharacterDamage(players, ownerId, character, amount, type = 'physical') {
   const owner = players[ownerId];
   if ((type === 'physical' || type === 'characterPhysical') && owner.physicalImmuneThisRound) {
-    return { damage: 0, shieldNote: '閲戝睘鏌滅敓鏁堬紝鏈鐗╀激鏃犳晥銆? '};
+    return { damage: 0, shieldNote: '金属柜生效，本次物伤无效。' };
   }
   if (type === 'characterPhysical' && character.immuneCharacterDamage) {
-    return { damage: 0, shieldNote: '璇ヨ鑹插厤鐤鑹查€犳垚鐨勪激瀹炽€? '};
+    return { damage: 0, shieldNote: '该角色免疫角色造成的伤害。' };
   }
   let damage = amount;
   if (type === 'physical' || type === 'characterPhysical') damage = Math.round(damage * (1 - characterPhysicalReduction(owner, character)));
@@ -1723,9 +1723,9 @@ function applyCharacterDamage(players, ownerId, character, amount, type = 'physi
   if (type !== 'true' && (character.shield ?? 0) > 0 && owner.pollution < 60) {
     character.shield -= 1;
     damage = Math.max(0, damage - 5);
-    shieldNote = '鎶ょ浘鐢熸晥锛屼激瀹?5銆?;'
+    shieldNote = '护盾生效，伤害-5。';
   } else if (type !== 'true' && (character.shield ?? 0) > 0 && owner.pollution >= 60) {
-    shieldNote = '姹℃煋杩囬珮锛屾姢鐩炬棤鏁堛€?;'
+    shieldNote = '污染过高，护盾无效。';
   }
   if (character.currentHp != null) character.currentHp = clampHp(character.currentHp - damage);
   return { damage, shieldNote };
@@ -1754,7 +1754,7 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
     owner.discard.push(mindTransfer);
     mindTransferConsumed = true;
     transferredCharacters.push({ ...target, currentHp: target.currentHp ?? target.hp ?? 10 });
-    logs.push(`銆婃剰璇嗚浆绉汇€嬭Е鍙戯紝${owner.label}澶鸿垗浜?{enemy.label}鐨勩€?{target.name}銆嬨€俙`);
+    logs.push(`《意识转移》触发，${owner.label}夺舍了${enemy.label}的《${target.name}》。`);
     return true;
   };
   const triggerTravelersBlood = () => {
@@ -1770,7 +1770,7 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
         applyCharacterSpiritDamage(character, 5);
       });
     });
-    logs.push(`${owner.label}鐨勩€婃梾浜虹殑椴滆銆嬭Е鍙戯紝鍏ㄥ憳-5琛€-5绮剧鍔涖€俙`);
+    logs.push(`${owner.label}的《旅人的鲜血》触发，全员-5血-5精神力。`);
     return true;
   };
   owner.characters = owner.characters.filter((character) => {
@@ -1780,9 +1780,9 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
     triggerMindTransfer();
     if (hasEquipment(owner, 'scene_corpse_land')) {
       healPlayer(owner, 5);
-      logs.push(`${owner.label}鐨勩€婇灏稿湴銆嬭Е鍙戯紝鏈綋+5琛€銆俙`);
+      logs.push(`${owner.label}的《食尸地》触发，本体+5血。`);
     }
-    logs.push(`${owner.label}鐨勩€?{character.name}銆嬫浜°€俙`);
+    logs.push(`${owner.label}的《${character.name}》死亡。`);
     return false;
   });
 
@@ -1791,16 +1791,16 @@ function cleanupDefeatedCharacters(players, ownerId, logs = []) {
     if (boardZoneOf(card) !== 'characters' || ((card.currentHp == null || card.currentHp > 0) && (card.spirit == null || card.spirit > 0))) return true;
     if (card.id === 'hidden_wood_tree') {
       enemy.characters.push(makeCharacterState({ ...card, type: 'character', subType: undefined }));
-      logs.push(`銆婃湪鏍戙€嬫浜★紝鍙樹负${enemy.label}鐨勮鑹层€俙`);
+      logs.push(`《木树》死亡，变为${enemy.label}的角色。`);
     } else {
       owner.discard.push(card);
-      logs.push(`${owner.label}鐨勬殫缃鑹层€?{card.name}銆嬫浜°€俙`);
+      logs.push(`${owner.label}的暗置角色《${card.name}》死亡。`);
     }
     triggerTravelersBlood();
     triggerMindTransfer();
     if (hasEquipment(owner, 'scene_corpse_land')) {
       healPlayer(owner, 5);
-      logs.push(`${owner.label}鐨勩€婇灏稿湴銆嬭Е鍙戯紝鏈綋+5琛€銆俙`);
+      logs.push(`${owner.label}的《食尸地》触发，本体+5血。`);
     }
     return false;
   });
@@ -1818,7 +1818,7 @@ function applyDarknessStartTurn(players) {
     const enemy = players[opponentOf(owner.id)];
     enemy.hp = clampHp(enemy.hp - 5 * darknessCount);
     logs.push(...applyPollutionChange(enemy, 5 * darknessCount));
-    logs.push(`銆婇粦鏆?銆嬭Е鍙戯細鍏ㄥ憳姹℃煋涓婂崌锛屾晫鏂规湰浣撳彈鎹熴€俙`);
+    logs.push(`《黑暗！》触发：全员污染上升，敌方本体受损。`);
   });
   return logs;
 }
@@ -1840,7 +1840,7 @@ function applyAbandonedCarriage(players, currentTurn) {
           if (boardZoneOf(hidden) === 'characters' && hidden.currentHp != null) hidden.currentHp = clampHp(hidden.currentHp - 4);
         });
       });
-      logs.push(`銆婃姏寮冧赴鍘€嬭Е鍙戯細鏁屾柟鏈綋-35锛屾墍鏈夌敓鐗?4銆俙`);
+      logs.push(`《抛弃丰厢》触发：敌方本体-35，所有生物-4。`);
     });
   });
   Object.values(players).forEach((player) => cleanupDefeatedCharacters(players, player.id, logs));
@@ -2609,7 +2609,7 @@ function App() {
   const [targetRequest, setTargetRequest] = useState(null);
   const [cycleRequest, setCycleRequest] = useState(null);
   const [netPanelOpen, setNetPanelOpen] = useState(false);
-  const [netStatus, setNetStatus] = useState('鏈繛鎺?');
+  const [netStatus, setNetStatus] = useState('未连接');
   const [netRole, setNetRole] = useState(null);
   const [localSeat, setLocalSeat] = useState('p1');
   const [offerText, setOfferText] = useState('');
@@ -2687,7 +2687,7 @@ function App() {
   const canCycle = isActivePerspective && isLocalTurn && canNetPlay && !isAiTurn && !blocksForPendingChoice && visiblePlayer.skill >= 1 && visiblePlayer.hand.length > 0;
 
   const statusText = useMemo(() => {
-    if (victor) return `${victor.label}鑾疯儨`;
+    if (victor) return `${victor.label}获胜`;
     return phaseLabel(game);
   }, [game, victor]);
 
@@ -2877,7 +2877,7 @@ function App() {
       peerRef.current.close();
       peerRef.current = null;
     }
-    setNetStatus('鏈繛鎺?');
+    setNetStatus('未连接');
     setNetRole(null);
     setNetError('');
     setNetReady({ local: false, remote: false });
@@ -2991,13 +2991,13 @@ function App() {
   function attachChannel(channel) {
     channelRef.current = channel;
     channel.onopen = () => {
-      setNetStatus('宸茶繛鎺?');
+      setNetStatus('已连接');
       setNetError('');
       sendNetState(game);
       sendNetName(localSeat, playerName);
     };
-    channel.onclose = () => setNetStatus('杩炴帴宸叉柇寮€');
-    channel.onerror = () => setNetStatus('杩炴帴寮傚父');
+    channel.onclose = () => setNetStatus('连接已断开');
+    channel.onerror = () => setNetStatus('连接异常');
     channel.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
@@ -3006,7 +3006,7 @@ function App() {
           return;
         }
         if (message.type === 'error') {
-          setNetError(message.message || '鑱旀満閿欒');
+          setNetError(message.message || '联机错误');
           return;
         }
         if (message.type === 'state' && message.game) {
@@ -3098,9 +3098,9 @@ function App() {
           p2: { ...current.players.p2, label: playerName },
         },
       }));
-      setNetStatus('绛夊緟瀵规柟鎺ユ敹');
+      setNetStatus('等待对方接收');
     } catch (error) {
-      setNetError('鎴块棿淇℃伅瑙ｆ瀽澶辫触');
+      setNetError('房间信息解析失败');
     }
   }
 
@@ -3112,9 +3112,9 @@ function App() {
       const peer = peerRef.current;
       if (!peer) throw new Error('missing peer');
       await peer.setRemoteDescription(answer);
-      setNetStatus('杩炴帴宸插畬鎴?');
+      setNetStatus('连接已完成');
     } catch (error) {
-      setNetError('鍥炵瓟淇℃伅瑙ｆ瀽澶辫触');
+      setNetError('回答信息解析失败');
     }
   }
 
@@ -3130,16 +3130,16 @@ function App() {
         await acceptAnswer(signalInput);
         return;
       }
-      setNetError('娌℃湁璇嗗埆鍒?offer 鎴?answer銆?');
+      setNetError('没有识别到 offer 或 answer。');
     } catch (error) {
-      setNetError('鑱旀満鐮佽В鏋愬け璐?');
+      setNetError('联机码解析失败');
     }
   }
 
   function markLocalReady() {
     const channel = channelRef.current;
     if (!channel || channel.readyState !== 'open') {
-      setNetError('鍏堣繛涓婂鏂癸紝鍐嶇偣鍑嗗銆?');
+      setNetError('先连上对方，再点准备。');
       return;
     }
     setNetReady((ready) => ({ ...ready, local: true }));
@@ -3202,7 +3202,7 @@ function App() {
 
   useEffect(() => {
     if (screen !== 'game') return;
-    const text = victor ? `${victor.label} 鑾疯儨` : phaseLabel(game);
+    const text = victor ? `${victor.label} 获胜` : phaseLabel(game);
     setPhaseBanner(text);
     const timer = window.setTimeout(() => setPhaseBanner(null), 900);
     return () => window.clearTimeout(timer);
@@ -3231,21 +3231,21 @@ function App() {
     updateGame((current) => {
       const actor = getActionActorCard(current);
       if (!actor) return nextPhase(current);
-      return advanceActionCursor(current, `${current.players[selectedPlayer].label}璺宠繃浜嗐€?{actor.name}銆嬬殑琛屽姩銆俙`);
+      return advanceActionCursor(current, `${current.players[selectedPlayer].label}跳过了《${actor.name}》的行动。`);
     });
   }
 
   function handleHandCard(card) {
     const reason = victor
-      ? '瀵瑰眬宸茬粡缁撴潫銆?'
+      ? '对局已经结束。'
       : !canPlay
-        ? '鐜板湪涓嶆槸浣犵殑鍑虹墝闃舵銆?'
+        ? '现在不是你的出牌阶段。'
         : getCannotPlayReason(game, selectedPlayer, card);
     if (reason) {
       if (selectedHandCardId === card.instanceId) setSelectedHandCardId(null);
       updateGame((current) => ({
         ...current,
-        log: [`涓嶈兘浣跨敤銆?{card.name}銆嬶細${reason}`, ...current.log],
+        log: [`不能使用《${card.name}》：${reason}`, ...current.log],
       }), { sync: false });
       return;
     }
@@ -3435,7 +3435,7 @@ function App() {
           />
         )}
 
-        <section className="switcher" aria-label="鐜╁瑙嗚">
+        <section className="switcher" aria-label="玩家视角">
           <span className="mode-badge">
             {modeLabel(mode)}
           </span>
@@ -3579,13 +3579,13 @@ function App() {
           <button
             className="drawer-toggle"
             onClick={() => setDrawerOpen((open) => !open)}
-            aria-label={drawerOpen ? '鏀惰捣鎻愮ず' : '鎵撳紑鎻愮ず'}
+            aria-label={drawerOpen ? '收起提示' : '打开提示'}
           >
             {drawerOpen ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
           <div className="drawer-content">
             <header>
-              <strong>瀵瑰眬鎻愮ず</strong>
+              <strong>对局提示</strong>
               <span>{modeLabel(mode)}</span>
             </header>
             <p className="drawer-status">{statusText}</p>
@@ -3845,7 +3845,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       }}
     >
       <section className="start-screen">
-        <button className="start-settings-button" onClick={() => setSettingsOpen((open) => !open)} aria-label="璁剧疆鍚嶅瓧">
+        <button className="start-settings-button" onClick={() => setSettingsOpen((open) => !open)} aria-label="设置名字">
           <Cog size={18} />
           <span>{playerName}</span>
         </button>
@@ -3961,7 +3961,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
             </button>
             <details className="advanced-ui-settings">
               <summary>高级界面设置</summary>
-              <label htmlFor="hand-card-scale">鎵嬬墝鍗＄墝澶у皬 70-180%</label>
+              <label htmlFor="hand-card-scale">手牌卡牌大小 70-180%</label>
               <input
                 id="hand-card-scale"
                 type="number"
@@ -3970,7 +3970,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.handCardScale ?? DEFAULT_SETTINGS.handCardScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handCardScale: event.target.value }))}
               />
-              <label htmlFor="hand-gap">鎵嬬墝闂磋窛 -40 鍒?80</label>
+              <label htmlFor="hand-gap">手牌间距 -40 到 80</label>
               <input
                 id="hand-gap"
                 type="number"
@@ -3979,7 +3979,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.handGap ?? DEFAULT_SETTINGS.handGap}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handGap: event.target.value }))}
               />
-              <label htmlFor="hand-text-scale">鎵嬬墝鏂囧瓧澶у皬 50-200%</label>
+              <label htmlFor="hand-text-scale">手牌文字大小 50-200%</label>
               <input
                 id="hand-text-scale"
                 type="number"
@@ -3988,7 +3988,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.handTextScale ?? DEFAULT_SETTINGS.handTextScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handTextScale: event.target.value }))}
               />
-              <label htmlFor="board-card-scale">鍦轰笂鍗＄墝澶у皬 70-180%</label>
+              <label htmlFor="board-card-scale">场上卡牌大小 70-180%</label>
               <input
                 id="board-card-scale"
                 type="number"
@@ -4006,7 +4006,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.startScale ?? DEFAULT_SETTINGS.startScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, startScale: event.target.value }))}
               />
-              <label htmlFor="game-offset-x">娓告垙绐楀彛宸﹀彸绉诲姩 -300 鍒?300</label>
+              <label htmlFor="game-offset-x">游戏窗口左右移动 -300 到 300</label>
               <input
                 id="game-offset-x"
                 type="number"
@@ -4015,7 +4015,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.gameOffsetX ?? DEFAULT_SETTINGS.gameOffsetX}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, gameOffsetX: event.target.value }))}
               />
-              <label htmlFor="game-offset-y">娓告垙绐楀彛涓婁笅绉诲姩 -300 鍒?300</label>
+              <label htmlFor="game-offset-y">游戏窗口上下移动 -300 到 300</label>
               <input
                 id="game-offset-y"
                 type="number"
@@ -4174,15 +4174,15 @@ function VictoryOverlay({ victor, onRestart, onHome }) {
   return (
     <div className="victory-overlay" aria-live="assertive">
       <article className="victory-panel">
-        <span className="victory-kicker">鑳滆礋宸插畾</span>
-        <h2>{victor.label} 鑾疯儨</h2>
+        <span className="victory-kicker">胜负已定</span>
+        <h2>{victor.label} 获胜</h2>
         <div className="victory-shine" aria-hidden="true" />
         <div className="victory-actions">
           <button className="primary-action" onClick={onRestart}>
-            鍐嶆潵涓€灞€
+            再来一局
           </button>
           <button className="mini-action" onClick={onHome}>
-            鍥炰富鑿滃崟
+            回主菜单
           </button>
         </div>
       </article>
@@ -4356,9 +4356,9 @@ function FourPlayerSeat({ player, perspective, selected, className = '', inspect
     <button className={`four-seat ${className} ${selected ? 'selected' : ''}`} onClick={onSelect}>
       <div className="four-seat-stats">
         <strong>{player.label}</strong>
-        <span className="mini-stat life">鈾?{player.hp}/{hpLimit}</span>
-        <span className="mini-stat spirit">鈼?{player.spirit ?? spiritLimit}/{spiritLimit}</span>
-        <span className="mini-stat pollution">鈼?{player.pollution}/{pollutionLimit}</span>
+        <span className="mini-stat life">● {player.hp}/{hpLimit}</span>
+        <span className="mini-stat spirit">● {player.spirit ?? spiritLimit}/{spiritLimit}</span>
+        <span className="mini-stat pollution">● {player.pollution}/{pollutionLimit}</span>
       </div>
       <div className="four-seat-portrait">
         {portraitCard ? (
@@ -4373,11 +4373,11 @@ function FourPlayerSeat({ player, perspective, selected, className = '', inspect
         ))}
       </div>
       <div className="four-seat-cards">
-        <SlotGroup icon={<Shield size={12} />} title="瑁呭" cards={player.equipment} limit={2} mode={perspective === 'self' ? 'mini' : 'mini'} onInspect={onInspect} />
-        <SlotGroup icon={<Zap size={12} />} title="鍦烘櫙" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
+        <SlotGroup icon={<Shield size={12} />} title="装备" cards={player.equipment} limit={2} mode={perspective === 'self' ? 'mini' : 'mini'} onInspect={onInspect} />
+        <SlotGroup icon={<Zap size={12} />} title="场景" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
         <SlotGroup
           icon={<Eye size={12} />}
-          title="鏆楃疆"
+          title="暗置"
           cards={player.hidden}
           limit={2}
           mode={perspective === 'self' ? 'mini' : 'hidden'}
@@ -4395,24 +4395,24 @@ function PlayerDetailOverlay({ player, perspective, inspected, onClose, onInspec
   return (
     <div className="detail-overlay player-detail-overlay" onClick={onClose}>
       <article className="player-detail-panel" onClick={(event) => event.stopPropagation()}>
-        <button className="detail-close" onClick={onClose} aria-label="鍏抽棴">
+        <button className="detail-close" onClick={onClose} aria-label="关闭">
           <X size={18} />
         </button>
         <header className="player-detail-header">
           <strong>{player.label}</strong>
           <div className="player-detail-stats">
-            <span className="mini-stat life">鈾?{player.hp}/{player.maxHp ?? PLAYER_BASE_HP}</span>
-            <span className="mini-stat spirit">鈼?{player.spirit ?? player.maxSpirit ?? PLAYER_BASE_SPIRIT}/{player.maxSpirit ?? PLAYER_BASE_SPIRIT}</span>
-            <span className="mini-stat pollution">鈼?{player.pollution}/{player.maxPollution ?? INITIAL_POLLUTION_LIMIT}</span>
-            <span className="mini-stat">鉁?{player.skill}</span>
+            <span className="mini-stat life">● {player.hp}/{player.maxHp ?? PLAYER_BASE_HP}</span>
+            <span className="mini-stat spirit">● {player.spirit ?? player.maxSpirit ?? PLAYER_BASE_SPIRIT}/{player.maxSpirit ?? PLAYER_BASE_SPIRIT}</span>
+            <span className="mini-stat pollution">● {player.pollution}/{player.maxPollution ?? INITIAL_POLLUTION_LIMIT}</span>
+            <span className="mini-stat">◆ {player.skill}</span>
           </div>
         </header>
         <div className="player-detail-zones">
-          <DetailZone title="瑙掕壊" cards={player.characters} emptyText="娌℃湁鏄庣疆瑙掕壊" onInspect={onInspect} />
-          <DetailZone title="瑁呭" cards={player.equipment} emptyText="娌℃湁瑁呭" onInspect={onInspect} />
-          <DetailZone title="鍦烘櫙" cards={player.scenes ?? []} emptyText="娌℃湁鍦烘櫙" onInspect={onInspect} />
+          <DetailZone title="角色" cards={player.characters} emptyText="没有明置角色" onInspect={onInspect} />
+          <DetailZone title="装备" cards={player.equipment} emptyText="没有装备" onInspect={onInspect} />
+          <DetailZone title="场景" cards={player.scenes ?? []} emptyText="没有场景" onInspect={onInspect} />
           <DetailZone
-            title="鏆楃疆"
+            title="暗置"
             cards={hiddenCards}
             emptyText={isSelf ? '没有暗置牌' : '对方暗置不可见'}
             hidden={!isSelf}
@@ -4454,34 +4454,34 @@ function PlayerBoard({ player, perspective, inspected, onInspect }) {
       <div className="player-stat">
         <strong>{player.label}</strong>
       </div>
-      <div className="life-meter" aria-label={`鐢熷懡 ${player.hp} / ${hpLimit}`}>
+      <div className="life-meter" aria-label={`生命 ${player.hp} / ${hpLimit}`}>
         <div className="meter-label">
-          <span>鐢熷懡</span>
+          <span>生命</span>
           <span>{player.hp} / {hpLimit}</span>
         </div>
         <div className="meter-track meter-life">
           <div className="meter-fill" style={{ width: `${Math.min(player.hp, hpLimit) / hpLimit * 100}%` }} />
         </div>
       </div>
-      <div className="spirit-meter" aria-label={`绮剧鍔?${spiritValue} / ${spiritLimit}`}>
+      <div className="spirit-meter" aria-label={`精神力 ${spiritValue} / ${spiritLimit}`}>
         <div className="meter-label spirit-label">
           <span>
             <img src={spiritIconUrl} alt="" />
-            绮剧鍔?          </span>
+            精神力</span>
           <span>{spiritValue} / {spiritLimit}</span>
         </div>
         <div className="meter-track meter-spirit">
           <div className="meter-fill" style={{ width: `${Math.min(spiritValue, spiritLimit) / spiritLimit * 100}%` }} />
         </div>
       </div>
-      <div className="skill-chip" aria-label={`鎶€鑳界偣 ${player.skill}`}>
+      <div className="skill-chip" aria-label={`技能点 ${player.skill}`}>
         <img src={skillIconUrl} alt="" />
         <span>{player.skill}</span>
-        <small>鎶€鑳界偣</small>
+        <small>技能点</small>
       </div>
-      <div className="pollution-meter" aria-label={`姹℃煋 ${player.pollution} / ${pollutionLimit}`}>
+      <div className="pollution-meter" aria-label={`污染 ${player.pollution} / ${pollutionLimit}`}>
         <div className="pollution-label">
-          <span>姹℃煋</span>
+          <span>污染</span>
           <span>{player.pollution} / {pollutionLimit}</span>
         </div>
         <div className="pollution-track">
@@ -4489,11 +4489,11 @@ function PlayerBoard({ player, perspective, inspected, onInspect }) {
         </div>
       </div>
       <div className="slots">
-        <SlotGroup icon={<Shield size={14} />} title="瑁呭" cards={player.equipment} limit={2} mode="mini" onInspect={onInspect} />
-        <SlotGroup icon={<Zap size={14} />} title="鍦烘櫙" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
+        <SlotGroup icon={<Shield size={14} />} title="装备" cards={player.equipment} limit={2} mode="mini" onInspect={onInspect} />
+        <SlotGroup icon={<Zap size={14} />} title="场景" cards={player.scenes ?? []} limit={3} mode="mini" onInspect={onInspect} />
         <SlotGroup
           icon={<Eye size={14} />}
-          title="鏆楃疆"
+          title="暗置"
           cards={player.hidden}
           limit={2}
           mode={isEnemy ? 'hidden' : 'mini'}
@@ -4554,13 +4554,13 @@ function SlotGroup({ icon, title, cards, limit, mode, revealCards = [], onInspec
                 key={card.instanceId}
                 onClick={() => reveal ? onInspect(reveal) : null}
               >
-                {reveal ? <span>{reveal.name}</span> : <span>鏆楃疆</span>}
+                {reveal ? <span>{reveal.name}</span> : <span>暗置</span>}
               </button>
             );
           }
           return (
             <button className={`small-card ${card.type}`} key={card.instanceId} onClick={() => onInspect(card)}>
-              {(card.gear || card.tags?.includes('榻胯疆')) && <Cog className="small-gear" size={12} aria-label="榻胯疆鏍囪" />}
+              {(card.gear || card.tags?.includes('齿轮')) && <Cog className="small-gear" size={12} aria-label="齿轮标记" />}
               <span>{card.name}</span>
             </button>
           );
@@ -4571,7 +4571,7 @@ function SlotGroup({ icon, title, cards, limit, mode, revealCards = [], onInspec
 }
 
 function CardMini({ card, disabled, disabledReason = '', selected = false, onClick, onInspect }) {
-  const hasGear = card.gear || card.tags?.includes('榻胯疆');
+  const hasGear = card.gear || card.tags?.includes('齿轮');
   return (
     <div className={`hand-card-wrap ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}`} title={disabledReason}>
       <button
@@ -4585,7 +4585,7 @@ function CardMini({ card, disabled, disabledReason = '', selected = false, onCli
           {card.valueText && <span className="frame-value">{card.valueText}</span>}
           <CardArt card={card} />
           {hasGear && (
-            <span className="frame-gear" title="榻胯疆鏍囪" aria-label="榻胯疆鏍囪">
+            <span className="frame-gear" title="齿轮标记" aria-label="齿轮标记">
               <Cog size={13} />
             </span>
         )}
@@ -4593,11 +4593,11 @@ function CardMini({ card, disabled, disabledReason = '', selected = false, onCli
         <small className="frame-type">{CARD_TYPES[card.type]}</small>
         {isCharacterLike(card) && (
           <em className="frame-stats">
-            {card.atk} 鏀?/ {card.hp == null ? '鐗规畩' : `${card.hp} 琛€`}
+            {card.atk} 攻 / {card.hp == null ? '特殊' : `${card.hp} 血`}
           </em>
         )}
       </button>
-      <button className="inspect-card" onClick={onInspect} aria-label={`鏌ョ湅${card.name}`}>
+      <button className="inspect-card" onClick={onInspect} aria-label={`查看${card.name}`}>
         <Info size={15} />
       </button>
     </div>
@@ -4608,27 +4608,27 @@ function targetEffectSummary(card, actor) {
   if (actor) {
     const parts = [];
     const damage = actor.actionDamage ?? actor.actionBodyDamage ?? actor.actionCharacterDamage ?? actor.atk ?? 0;
-    if (damage > 0) parts.push(`${damage}鐐圭墿浼`);
-    if (actor.actionSpiritDamage) parts.push(`-${actor.actionSpiritDamage}绮剧鍔沗`);
-    if (actor.actionPolluteEnemy) parts.push(`+${actor.actionPolluteEnemy}姹℃煋`);
-    if (actor.actionShield) parts.push(`鑷韩+${actor.actionShield}鎶ょ浘`);
-    if (actor.actionEffect === 'itAction') parts.push('閫夋嫨涓€涓鑹叉浜?');
-    return parts.join(' / ') || '閫夋嫨鐩爣';
+    if (damage > 0) parts.push(`${damage}点物伤`);
+    if (actor.actionSpiritDamage) parts.push(`-${actor.actionSpiritDamage}精神力`);
+    if (actor.actionPolluteEnemy) parts.push(`+${actor.actionPolluteEnemy}污染`);
+    if (actor.actionShield) parts.push(`自身+${actor.actionShield}护盾`);
+    if (actor.actionEffect === 'itAction') parts.push('选择一个角色死亡');
+    return parts.join(' / ') || '选择目标';
   }
-  if (!card) return '閫夋嫨鐩爣';
+  if (!card) return '选择目标';
   if (card.effect === 'killTarget') return '40鐐圭墿浼?;'
-  if (card.effect === 'removeEnemyHidden') return '娑堥櫎涓€寮犳殫缃?;'
-  if (card.effect === 'destroyEnemyScene') return '鎽ф瘉涓€寮犲満鏅墝';
-  if (card.effect === 'memorySceneRemove') return '绉婚櫎鍦烘櫙锛?10绮剧鍔涳紝+10姹℃煋';
-  if (card.effect === 'feedingContract') return '绉婚櫎鎴戞柟闈為娇杞鑹诧紝鏈綋+20琛€+8绮剧鍔?1鎶€鑳界偣';
-  if (card.effect === 'shieldCard') return '閫夋嫨涓€涓繁鏂硅鑹?1鎶ょ浘';
-  if (card.effect === 'itEnter') return '閫夋嫨瀵规柟涓€涓鑹叉浜?;'
-  if (card.effect === 'orcaEnter') return '閫夋嫨瀵规柟瑙掕壊锛屾姢鐩惧け鏁?;'
-  return card.text ?? '閫夋嫨鐩爣';
+  if (card.effect === 'removeEnemyHidden') return '消除一张暗牌';
+  if (card.effect === 'destroyEnemyScene') return '摧毁一张场景牌';
+  if (card.effect === 'memorySceneRemove') return '移除场景，+10精神力，+10污染';
+  if (card.effect === 'feedingContract') return '移除我方非齿轮角色，本体+20血+8精神力+1技能点';
+  if (card.effect === 'shieldCard') return '选择一个己方角色+1护盾';
+  if (card.effect === 'itEnter') return '选择对方一个角色死亡';
+  if (card.effect === 'orcaEnter') return '选择对方角色，护盾失效';
+  return card.text ?? '选择目标';
 }
 
 function PlayCardBurst({ card }) {
-  const hasGear = card.gear || card.tags?.includes('榻胯疆');
+  const hasGear = card.gear || card.tags?.includes('齿轮');
   return (
     <div className="play-card-burst" aria-hidden="true">
       <div
@@ -4648,7 +4648,7 @@ function PlayCardBurst({ card }) {
         <small className="frame-type">{CARD_TYPES[card.type]}</small>
         {isCharacterLike(card) && (
           <em className="frame-stats">
-            {card.atk} 鏀?/ {card.hp == null ? '鐗规畩' : `${card.hp} 琛€`}
+            {card.atk} 攻 / {card.hp == null ? '特殊' : `${card.hp} 血`}
           </em>
         )}
       </div>
@@ -4670,24 +4670,24 @@ function DamageHeartBurst({ burst }) {
 }
 
 function CardDetail({ card, onClose }) {
-  const hasGear = card.gear || card.tags?.includes('榻胯疆');
+  const hasGear = card.gear || card.tags?.includes('齿轮');
   return (
     <div className="detail-overlay" onClick={onClose}>
       <article className="detail-dialog" onClick={(event) => event.stopPropagation()}>
-        <button className="detail-close" onClick={onClose} aria-label="鍏抽棴">
+        <button className="detail-close" onClick={onClose} aria-label="关闭">
           <X size={18} />
         </button>
         <CardPreview card={card} />
         <section className="detail-copy">
           <div className="detail-title">
             <h2>{card.name}</h2>
-            <span>{CARD_TYPES[card.type]}{card.subType ? ` 路 ${card.subType}` : ''}</span>
+            <span>{CARD_TYPES[card.type]}{card.subType ? ` · ${card.subType}` : ''}</span>
           </div>
           <div className="detail-tags">
-            <span>娑堣€?{card.cost}</span>
-            {card.valueText && <span>姹℃煋 {card.valueText}</span>}
-            {isCharacterLike(card) && <span>{card.hp == null ? '鐗规畩鐢熷懡' : `${card.hp} 鐢熷懡`}</span>}
-            {hasGear && <span>榻胯疆</span>}
+            <span>消耗 {card.cost}</span>
+            {card.valueText && <span>污染 {card.valueText}</span>}
+            {isCharacterLike(card) && <span>{card.hp == null ? '特殊生命' : `${card.hp} 生命`}</span>}
+            {hasGear && <span>齿轮</span>}
           </div>
           <p>{card.text}</p>
           {card.notes && <small>{card.notes}</small>}
@@ -4779,9 +4779,9 @@ function TargetPicker({ card, enemy, enemies, actor, onCancel, onSelect }) {
 
 function WordlessBookPicker({ card, onCancel, onSelect }) {
   const options = [
-    { option: 'resetPollution', title: '閲嶇疆姹℃煋', text: '姹℃煋鍙樹负0锛岀敓鍛戒笂闄?5銆? '},
-    { option: 'heal', title: '鎭㈠鐢熷懡', text: '鏈綋+50琛€锛岀敓鍛戒笂闄?5銆? '},
-    { option: 'spirit', title: '鎭㈠绮剧', text: '鏈綋+40绮剧鍔涳紝鐢熷懡涓婇檺-5銆? '},
+    { option: 'resetPollution', title: '重置污染', text: '污染变为0，生命上限-5。' },
+    { option: 'heal', title: '恢复生命', text: '本体+50血，生命上限-5。' },
+    { option: 'spirit', title: '恢复精神', text: '本体+40精神力，生命上限-5。' },
   ];
   return (
     <div className="detail-overlay" onClick={onCancel}>
@@ -4888,7 +4888,7 @@ function CyclePicker({ hand, onCancel, onSelect }) {
 }
 
 function CardPreview({ card }) {
-  const hasGear = card.gear || card.tags?.includes('榻胯疆');
+  const hasGear = card.gear || card.tags?.includes('齿轮');
   return (
     <div
       className={`card-mini card-preview framed-card ${card.type}`}

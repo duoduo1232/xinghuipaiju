@@ -1,0 +1,20 @@
+#!/bin/sh
+# 提交前编码护栏: 拦截带乱码 (mojibake) 的文件进入版本库。
+# 启用方式 (clone 后执行一次): git config core.hooksPath .githooks
+#
+# 检查全量源文件的编码健康度 (PUA / U+FFFD 零容忍 + 可疑字符 baseline)。
+# 若检测到结构性乱码或 BOM, 阻止提交。
+
+echo "[pre-commit] 编码检查..."
+node scripts/check-encoding.mjs
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo ""
+  echo "[pre-commit] 编码检查未通过, 提交已阻止。"
+  echo "  原因通常是文件被以 GBK/ANSI 等非 UTF-8 编码保存, 导致中文变成乱码。"
+  echo "  请将文件另存为 UTF-8 (无 BOM) 后重试。"
+  echo "  如果确认是有意清理旧乱码, 运行: npm run check:encoding:update"
+  exit 1
+fi
+echo "[pre-commit] 编码检查通过。"
+exit 0

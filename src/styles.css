@@ -3026,12 +3026,26 @@ button:not(:disabled) {
     min-height: 100vh;
     border-radius: 0;
     border-width: 0;
-    gap: 22px;
-    padding: 72px 18px 24px;
+    gap: 16px;
+    padding: 64px 14px 20px;
+  }
+
+  .start-title {
+    gap: 6px;
+  }
+
+  .start-title h1 {
+    font-size: 32px;
+  }
+
+  .start-title span {
+    font-size: 13px;
   }
 
   .start-stats {
     grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 8px 12px;
     border-radius: 18px;
   }
 
@@ -3041,7 +3055,64 @@ button:not(:disabled) {
   }
 
   .start-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .start-card {
+    min-height: 96px;
+    gap: 6px;
+    padding: 14px 12px;
+    border-radius: 16px;
+  }
+
+  .start-card strong {
+    font-size: 17px;
+  }
+
+  .start-card span {
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .p2p-dialog {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .p2p-header {
+    margin: 0 40px 12px 0;
+  }
+
+  .p2p-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .room-create-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .room-create-card .primary-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .room-server-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .room-server-card .mini-action,
+  .room-server-card .primary-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .room-list {
+    max-height: min(360px, 48vh);
   }
 
   .table-topbar {

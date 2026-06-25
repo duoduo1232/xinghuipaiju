@@ -10,3 +10,15 @@ android/**/build/
 android/local.properties
 .tmp-chrome-goal/
 ui-*.png
+
+# 一次性产物 (乱码修复脚本 / 界面备份 / 生图输出 / 临时诊断文件)
+backup-ui/
+generated-images/
+scripts/gen-image.py
+scripts/fix-mojibake.py
+scripts/fix-broken-lines.py
+scripts/fix-broken-lines2.py
+scripts/fix-icons.py
+scripts/_*.txt
+scripts/_*.py
+nul

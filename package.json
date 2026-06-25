@@ -1,12 +1,13 @@
 {
   "name": "pixel-card-duel",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "prepare": "git config core.hooksPath .githooks || true",
     "screenshot": "node scripts/screenshot-ui.mjs",
     "gen:image": "node scripts/generate-sensenova-image.mjs",
     "check:encoding": "node scripts/check-encoding.mjs",

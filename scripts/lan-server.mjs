@@ -40,7 +40,7 @@ function getPublicRooms() {
       const host = peers.find((peer) => peer.isHost) || peers[0];
       return {
         id,
-        hostName: host?.playerName || '鐜╁',
+        hostName: host?.playerName || '玩家',
         players: peers.length,
         maxPlayers: maxPeersPerRoom,
         status: peers.length >= maxPeersPerRoom ? 'playing' : 'waiting',
