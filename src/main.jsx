@@ -50,6 +50,17 @@ const DEFAULT_LEADERBOARD_URL = APP_CONFIG.leaderboardUrl;
 const DEFAULT_RELAY_URL = APP_CONFIG.defaultRelayUrl ?? 'ws://duoduo1215.xyz:18781';
 const NativeUpdater = registerPlugin('NativeUpdater');
 
+// 更新加速节点预设（下拉直选，最后一项为自定义入口）
+const PROXY_PRESETS = [
+  { value: '', label: '直连（不加速）' },
+  { value: 'https://ghproxy.cxkpro.top', label: 'cxk 镜像（ghproxy.cxkpro.top）' },
+  { value: 'https://gh-proxy.com', label: 'gh-proxy.com' },
+  { value: 'https://gitproxy.mrhjx.cn', label: 'mrhjx 镜像（gitproxy.mrhjx.cn）' },
+  { value: 'https://ghproxy.imciel.com', label: 'imciel 镜像（ghproxy.imciel.com）' },
+  { value: 'https://gh.idayer.com', label: 'idayer 镜像（gh.idayer.com）' },
+  { value: 'https://github.ednovas.xyz', label: 'ednovas 镜像（github.ednovas.xyz）' },
+];
+
 function getCardArtUrl(card) {
   if (card.artDataUrl) return card.artDataUrl;
   const filename = CARD_ART_FILENAMES[card.id];
@@ -1474,7 +1485,8 @@ function runSmallPhaseEndHiddenTriggers(players) {
     [...owner.hidden].forEach((card) => {
       if (card.id === 'hidden_first_aid' && owner.hp < 20) {
         healPlayer(owner, 25);
-        logs.push(`${owner.label}的暗置《${card.name}》触发，本体+25血。`);
+        discardHiddenCard(owner, card);
+        logs.push(`${owner.label}的暗置《${card.name}》触发，本体+25血，技能牌消耗。`);
       }
       if (card.id === 'hidden_purifier' && owner.pollution >= 40) {
         logs.push(...applyPollutionChange(owner, -5));
@@ -3905,22 +3917,36 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
               placeholder="用户名/仓库名"
             />
             <label htmlFor="update-proxy">更新加速节点</label>
-            <input
+            <select
               id="update-proxy"
-              list="proxy-presets"
-              value={draftSettings.updateProxy ?? DEFAULT_UPDATE_PROXY}
-              onChange={(event) => setDraftSettings((current) => ({ ...current, updateProxy: event.target.value }))}
-              placeholder="留空则直连"
-            />
-            <datalist id="proxy-presets">
-              <option value="">直连（不加速）</option>
-              <option value="https://ghproxy.cxkpro.top" />
-              <option value="https://gh-proxy.com" />
-              <option value="https://gitproxy.mrhjx.cn" />
-              <option value="https://ghproxy.imciel.com" />
-              <option value="https://gh.idayer.com" />
-              <option value="https://github.ednovas.xyz" />
-            </datalist>
+              className="settings-select"
+              value={
+                PROXY_PRESETS.some((p) => p.value === (draftSettings.updateProxy ?? DEFAULT_UPDATE_PROXY))
+                  ? (draftSettings.updateProxy ?? DEFAULT_UPDATE_PROXY)
+                  : '__custom__'
+              }
+              onChange={(event) => {
+                const v = event.target.value;
+                if (v === '__custom__') {
+                  setDraftSettings((current) => ({ ...current, updateProxy: current.updateProxy || '' }));
+                } else {
+                  setDraftSettings((current) => ({ ...current, updateProxy: v }));
+                }
+              }}
+            >
+              {PROXY_PRESETS.map((preset) => (
+                <option key={preset.value || 'direct'} value={preset.value}>{preset.label}</option>
+              ))}
+              <option value="__custom__">自定义…</option>
+            </select>
+            {!PROXY_PRESETS.some((p) => p.value === (draftSettings.updateProxy ?? DEFAULT_UPDATE_PROXY)) && (
+              <input
+                id="update-proxy-custom"
+                value={draftSettings.updateProxy ?? ''}
+                onChange={(event) => setDraftSettings((current) => ({ ...current, updateProxy: event.target.value }))}
+                placeholder="输入自定义加速地址，留空则直连"
+              />
+            )}
             <section className={`update-panel ${updateState.status}`}>
               <div className="update-version-row">
                 <span>当前版本</span>
@@ -3997,7 +4023,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
                 value={draftSettings.boardCardScale ?? DEFAULT_SETTINGS.boardCardScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, boardCardScale: event.target.value }))}
               />
-              <label htmlFor="start-scale">涓荤晫闈㈠ぇ灏?60-160%</label>
+              <label htmlFor="start-scale">主界面大小 60-160%</label>
               <input
                 id="start-scale"
                 type="number"

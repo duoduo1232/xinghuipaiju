@@ -340,7 +340,8 @@ button:not(:disabled) {
   resize: vertical;
 }
 
-.developer-card-form select {
+.developer-card-form select,
+.settings-select {
   width: 100%;
   padding: 9px 10px;
   color: #30425d;
@@ -1973,7 +1974,7 @@ button:not(:disabled) {
 .victory-overlay {
   position: absolute;
   inset: 0;
-  z-index: 14;
+  z-index: 13000;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -3141,7 +3142,9 @@ button:not(:disabled) {
   }
 
   .hand-card-wrap {
-    flex-basis: 108px;
+    flex-basis: calc(108px * var(--hand-card-scale, 1));
+    transform-origin: bottom center;
+    transform: scale(var(--hand-card-scale, 1));
     margin-left: 0;
   }
 
@@ -3503,7 +3506,9 @@ button:not(:disabled) {
   }
 
   .hand-card-wrap {
-    flex-basis: 80px;
+    flex-basis: calc(80px * var(--hand-card-scale, 1));
+    transform-origin: bottom center;
+    transform: scale(var(--hand-card-scale, 1));
     margin-left: 0;
   }
 
@@ -3844,7 +3849,9 @@ button:not(:disabled) {
   }
 
   .hand-card-wrap {
-    flex-basis: 90px;
+    flex-basis: calc(90px * var(--hand-card-scale, 1));
+    transform-origin: bottom center;
+    transform: scale(var(--hand-card-scale, 1));
     margin-left: 0;
   }
 
@@ -4058,7 +4065,9 @@ button:not(:disabled) {
   }
 
   .hand-card-wrap {
-    flex-basis: 80px;
+    flex-basis: calc(80px * var(--hand-card-scale, 1));
+    transform-origin: bottom center;
+    transform: scale(var(--hand-card-scale, 1));
   }
 
   .card-mini {
@@ -4304,7 +4313,7 @@ button:not(:disabled) {
   }
 
   .hand-card-wrap {
-    flex-basis: 70px;
+    flex-basis: calc(70px * var(--hand-card-scale, 1));
     margin-left: 0;
     transform: translateY(-14px) scale(var(--hand-card-scale, 1));
   }
