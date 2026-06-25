@@ -388,7 +388,7 @@ function getStoredSettings() {
       ...parsed,
       uiScale: Math.min(300, Math.max(1, Number(parsed.uiScale) || DEFAULT_SETTINGS.uiScale)),
       fontScale: Math.min(200, Math.max(50, Number(parsed.fontScale) || DEFAULT_SETTINGS.fontScale)),
-      handCardScale: Math.min(180, Math.max(70, Number(parsed.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
+      handCardScale: Math.min(250, Math.max(70, Number(parsed.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
       handGap: Math.min(80, Math.max(-40, Number(parsed.handGap) || DEFAULT_SETTINGS.handGap)),
       handTextScale: Math.min(200, Math.max(50, Number(parsed.handTextScale) || DEFAULT_SETTINGS.handTextScale)),
       boardCardScale: Math.min(180, Math.max(70, Number(parsed.boardCardScale) || DEFAULT_SETTINGS.boardCardScale)),
@@ -3798,7 +3798,7 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
       ...draftSettings,
       uiScale: Math.min(300, Math.max(1, Number(draftSettings.uiScale) || 100)),
       fontScale: Math.min(200, Math.max(50, Number(draftSettings.fontScale) || 100)),
-      handCardScale: Math.min(180, Math.max(70, Number(draftSettings.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
+      handCardScale: Math.min(250, Math.max(70, Number(draftSettings.handCardScale) || DEFAULT_SETTINGS.handCardScale)),
       handGap: Math.min(80, Math.max(-40, Number(draftSettings.handGap) || DEFAULT_SETTINGS.handGap)),
       handTextScale: Math.min(200, Math.max(50, Number(draftSettings.handTextScale) || DEFAULT_SETTINGS.handTextScale)),
       boardCardScale: Math.min(180, Math.max(70, Number(draftSettings.boardCardScale) || DEFAULT_SETTINGS.boardCardScale)),
@@ -4137,12 +4137,12 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
             </button>
             <details className="advanced-ui-settings">
               <summary>高级界面设置</summary>
-              <label htmlFor="hand-card-scale">手牌卡牌大小 70-180%</label>
+              <label htmlFor="hand-card-scale">手牌卡牌大小 70-250%</label>
               <input
                 id="hand-card-scale"
                 type="number"
                 min="70"
-                max="180"
+                max="250"
                 value={draftSettings.handCardScale ?? DEFAULT_SETTINGS.handCardScale}
                 onChange={(event) => setDraftSettings((current) => ({ ...current, handCardScale: event.target.value }))}
               />

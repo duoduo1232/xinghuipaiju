@@ -3190,13 +3190,12 @@ button:not(:disabled) {
   .hand-card-wrap {
     flex-basis: calc(108px * var(--hand-card-scale, 1));
     transform-origin: bottom center;
-    transform: scale(var(--hand-card-scale, 1));
     margin-left: 0;
   }
 
   .card-mini {
-    width: 108px;
-    height: 143px;
+    width: calc(108px * var(--hand-card-scale, 1));
+    height: calc(143px * var(--hand-card-scale, 1));
   }
 
   .card-preview {
@@ -3283,8 +3282,8 @@ button:not(:disabled) {
   }
 
   .card-mini {
-    width: 108px;
-    height: 144px;
+    width: calc(108px * var(--hand-card-scale, 1));
+    height: calc(144px * var(--hand-card-scale, 1));
   }
 
   .frame-name {
@@ -3554,7 +3553,6 @@ button:not(:disabled) {
   .hand-card-wrap {
     flex-basis: calc(80px * var(--hand-card-scale, 1));
     transform-origin: bottom center;
-    transform: scale(var(--hand-card-scale, 1));
     margin-left: 0;
   }
 
@@ -3563,8 +3561,8 @@ button:not(:disabled) {
   }
 
   .card-mini {
-    width: 80px;
-    height: 106px;
+    width: calc(80px * var(--hand-card-scale, 1));
+    height: calc(106px * var(--hand-card-scale, 1));
     border-radius: 8px;
   }
 
@@ -3897,7 +3895,6 @@ button:not(:disabled) {
   .hand-card-wrap {
     flex-basis: calc(90px * var(--hand-card-scale, 1));
     transform-origin: bottom center;
-    transform: scale(var(--hand-card-scale, 1));
     margin-left: 0;
   }
 
@@ -3906,8 +3903,8 @@ button:not(:disabled) {
   }
 
   .card-mini {
-    width: 90px;
-    height: 120px;
+    width: calc(90px * var(--hand-card-scale, 1));
+    height: calc(120px * var(--hand-card-scale, 1));
     border-radius: 8px;
   }
 
@@ -4114,12 +4111,11 @@ button:not(:disabled) {
   .hand-card-wrap {
     flex-basis: calc(80px * var(--hand-card-scale, 1));
     transform-origin: bottom center;
-    transform: scale(var(--hand-card-scale, 1));
   }
 
   .card-mini {
-    width: 80px;
-    height: 106px;
+    width: calc(80px * var(--hand-card-scale, 1));
+    height: calc(106px * var(--hand-card-scale, 1));
   }
 
   .frame-name {
