@@ -1,6 +1,6 @@
 :root {
   color: #2f2a22;
-  background: #f4eddc;
+  background: #2f261c;
   font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -54,6 +54,11 @@ button:not(:disabled) {
   display: grid;
   place-items: center;
   padding: 10px;
+  padding-left: max(10px, env(safe-area-inset-left));
+  padding-right: max(10px, env(safe-area-inset-right));
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
   transform: translate(var(--app-window-offset-x, 0px), var(--app-window-offset-y, 0px));
   transform-origin: center;
   background:
@@ -1350,6 +1355,9 @@ button:not(:disabled) {
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .small-card,
@@ -4255,7 +4263,7 @@ button:not(:disabled) {
   .small-card,
   .hidden-back,
   .small-empty {
-    flex-basis: 44px;
+    flex: 0 0 58px;
     min-height: 17px;
     padding: 2px 4px;
     border-radius: 8px;
@@ -4355,16 +4363,16 @@ button:not(:disabled) {
   .hand-card-wrap {
     flex-basis: calc(70px * var(--hand-card-scale, 1));
     margin-left: 0;
-    transform: translateY(-14px) scale(var(--hand-card-scale, 1));
+    transform: translateY(-14px);
   }
 
   .hand-card-wrap.selected {
-    transform: translateY(-22px) scale(calc(var(--hand-card-scale, 1) * 1.16));
+    transform: translateY(-22px) scale(1.08);
   }
 
   .card-mini {
-    width: 70px;
-    height: 93px;
+    width: calc(70px * var(--hand-card-scale, 1));
+    height: calc(93px * var(--hand-card-scale, 1));
   }
 
   .frame-cost {
@@ -4420,5 +4428,120 @@ button:not(:disabled) {
   .drawer-toggle {
     width: 29px;
     height: 54px;
+  }
+}
+
+/* 手机横屏专用：4 人模式紧凑布局，避免座位挤成一团 + 垂直溢出 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .battlefield-four {
+    grid-template-columns: minmax(0, 1fr) 78px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "left top right"
+      "left center self";
+    gap: 4px;
+    padding: 3px 4px;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .four-seat {
+    grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr);
+    gap: 3px;
+    padding: 4px;
+    border-radius: 12px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .four-seat-stats {
+    gap: 1px;
+  }
+
+  .four-seat-stats strong {
+    font-size: 10px;
+    line-height: 1.1;
+  }
+
+  .mini-stat {
+    padding: 1px 4px;
+    font-size: 8px;
+    gap: 2px;
+  }
+
+  .four-seat-portrait {
+    min-height: 0;
+  }
+
+  .default-avatar {
+    min-height: 0;
+  }
+
+  .four-seat-markers {
+    gap: 3px;
+    margin-top: 1px;
+  }
+
+  .four-seat-markers span {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+    border-radius: 4px;
+  }
+
+  .four-seat-cards {
+    gap: 2px;
+  }
+
+  .four-seat-cards .slot-row {
+    min-height: 16px;
+    padding: 1px 4px;
+    gap: 4px;
+  }
+
+  .four-seat-cards .small-card,
+  .four-seat-cards .hidden-back,
+  .four-seat-cards .small-empty {
+    min-height: 15px;
+    flex: 0 0 44px;
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+
+  /* seat-top 在窄中列里只显示精简信息，不再被压成乱条 */
+  .seat-top {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .seat-top .four-seat-portrait {
+    display: none;
+  }
+
+  .seat-top .four-seat-cards {
+    display: none;
+  }
+
+  .center-panel-four {
+    gap: 3px;
+  }
+
+  .center-panel-four .phase-chip {
+    font-size: 8px;
+    padding: 2px 5px;
+  }
+
+  .center-panel-four .primary-action {
+    font-size: 9px;
+    padding: 4px 6px;
+    min-height: 0;
+  }
+
+  .center-panel-four .mini-action {
+    font-size: 8px;
+    padding: 3px 5px;
   }
 }

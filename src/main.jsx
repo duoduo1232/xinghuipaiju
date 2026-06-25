@@ -2338,16 +2338,7 @@ function playCard(game, playerId, card) {
   let message = `${player.label}使用了《${used.name}》。`;
   triggerMetalCabinetIfAttack(enemy, used, pollutionLogs);
 
-  if (used.id === 'char_protector') {
-    player.hidden.push({
-      ...makeCharacterState(used),
-      type: 'hidden',
-      subType: 'character',
-      actionCount: 1,
-      playedTurn: game.turn,
-    });
-    message = `${player.label}使用《${used.name}》。`;
-  } else if (used.type === 'character') {
+  if (used.type === 'character') {
     player.characters.push(makeCharacterState(used));
   }
   if (used.type === 'equipment') player.equipment.push(used);
@@ -2690,6 +2681,7 @@ function App() {
   const peerRef = useRef(null);
   const channelRef = useRef(null);
   const suppressNetSyncRef = useRef(false);
+  const seatNamesRef = useRef({});
   const recordedMatchRef = useRef(null);
   const healthFxRef = useRef(null);
   const aiCyclePhaseRef = useRef(null);
@@ -2885,6 +2877,8 @@ function App() {
   }
 
   function sendNetName(seat = localSeat, name = playerName) {
+    const clean = String(name).trim().slice(0, 10) || DEFAULT_PLAYER_NAME;
+    seatNamesRef.current[seat] = clean;
     const channel = channelRef.current;
     if (!isNetChannelOpen(channel)) return;
     channel.send(JSON.stringify({ type: 'name', seat, name }));
@@ -2892,16 +2886,33 @@ function App() {
 
   function applyRemoteName(seat, name) {
     if (!seat || !name) return;
+    const clean = String(name).trim().slice(0, 10) || DEFAULT_PLAYER_NAME;
+    seatNamesRef.current[seat] = clean;
     setGame((current) => ({
       ...current,
       players: {
         ...current.players,
         [seat]: {
           ...current.players[seat],
-          label: String(name).trim().slice(0, 10) || DEFAULT_PLAYER_NAME,
+          label: clean,
         },
       },
     }));
+  }
+
+  // 用已知的双方真名覆盖 game 里的 label，避免 state 同步把名字冲回默认"玩家"。
+  function applyKnownNames(nextGame) {
+    const names = seatNamesRef.current;
+    if (!nextGame?.players || !Object.keys(names).length) return nextGame;
+    const players = { ...nextGame.players };
+    let changed = false;
+    for (const seat of Object.keys(names)) {
+      if (players[seat] && names[seat] && players[seat].label !== names[seat]) {
+        players[seat] = { ...players[seat], label: names[seat] };
+        changed = true;
+      }
+    }
+    return changed ? { ...nextGame, players } : nextGame;
   }
 
   function updateGame(updater, { sync = true } = {}) {
@@ -3009,7 +3020,8 @@ function App() {
             socket.localSeat = message.seat;
             setLocalSeat(message.seat);
             setSelectedPlayer(message.seat);
-            setGame(setupGame({ mode, localName: playerName, localSeat: message.seat }));
+            seatNamesRef.current[message.seat] = String(playerName).trim().slice(0, 10) || DEFAULT_PLAYER_NAME;
+            setGame(applyKnownNames(setupGame({ mode, localName: playerName, localSeat: message.seat })));
           }
           if (message.type === 'lan-ready') {
             setNetReady({ local: true, remote: true });
@@ -3025,7 +3037,7 @@ function App() {
           }
           if (message.type === 'state' && message.game) {
             suppressNetSyncRef.current = true;
-            setGame(message.game);
+            setGame(applyKnownNames(message.game));
             window.setTimeout(() => {
               suppressNetSyncRef.current = false;
             }, 0);
