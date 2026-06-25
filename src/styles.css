@@ -4014,19 +4014,20 @@ button:not(:disabled) {
   }
 
   .character-row {
-    height: 112px;
+    height: calc(112px * var(--board-card-scale, 1));
     min-height: 0;
     overflow: hidden;
   }
 
   .unit-card,
   .empty-slot {
-    min-height: 98px;
-    max-height: 106px;
+    min-height: calc(98px * var(--board-card-scale, 1));
+    max-height: calc(112px * var(--board-card-scale, 1));
+    max-width: calc(150px * var(--board-card-scale, 1));
   }
 
   .unit-card {
-    grid-template-rows: 48px auto auto;
+    grid-template-rows: calc(48px * var(--board-card-scale, 1)) auto auto;
   }
 
   .unit-art {
@@ -4089,13 +4090,13 @@ button:not(:disabled) {
 
   .unit-card,
   .empty-slot {
-    min-height: 88px;
-    max-height: 116px;
-    max-width: 122px;
+    min-height: calc(88px * var(--board-card-scale, 1));
+    max-height: calc(116px * var(--board-card-scale, 1));
+    max-width: calc(122px * var(--board-card-scale, 1));
   }
 
   .unit-card {
-    grid-template-rows: minmax(40px, 1fr) auto auto;
+    grid-template-rows: minmax(calc(40px * var(--board-card-scale, 1)), 1fr) auto auto;
   }
 
   .hand-tray {
@@ -4274,20 +4275,21 @@ button:not(:disabled) {
 
   .unit-card,
   .empty-slot {
-    min-height: 96px;
-    max-height: 136px;
-    max-width: 104px;
+    flex: 0 1 calc(82px * var(--board-card-scale, 1));
+    min-height: calc(96px * var(--board-card-scale, 1));
+    max-height: calc(136px * var(--board-card-scale, 1));
+    max-width: calc(104px * var(--board-card-scale, 1));
   }
 
   .unit-card {
-    grid-template-rows: minmax(48px, 1fr) auto auto;
+    grid-template-rows: minmax(calc(48px * var(--board-card-scale, 1)), 1fr) auto auto;
     gap: 2px;
     padding: 4px;
   }
 
   .unit-art,
   .unit-back {
-    height: 48px;
+    height: calc(48px * var(--board-card-scale, 1));
   }
 
   .unit-card strong {
