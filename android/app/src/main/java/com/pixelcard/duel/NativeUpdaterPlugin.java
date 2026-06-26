@@ -12,8 +12,10 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -44,6 +46,18 @@ public class NativeUpdaterPlugin extends Plugin {
     }
 
     private File downloadApk(String urlText, String fileName) throws Exception {
+        File dir = new File(getContext().getCacheDir(), "updates");
+        if (!dir.exists() && !dir.mkdirs()) {
+          throw new Exception("Unable to create update cache directory");
+        }
+
+        File apkFile = new File(dir, fileName.endsWith(".apk") ? fileName : fileName + ".apk");
+        File metaFile = new File(dir, apkFile.getName() + ".meta");
+        if (isCachedApkReady(apkFile, metaFile, urlText)) {
+            notifyDownloadProgress(apkFile.length(), apkFile.length());
+            return apkFile;
+        }
+
         HttpURLConnection connection = (HttpURLConnection) new URL(urlText).openConnection();
         connection.setInstanceFollowRedirects(true);
         connection.setConnectTimeout(20000);
@@ -56,13 +70,8 @@ public class NativeUpdaterPlugin extends Plugin {
         }
         long totalBytes = connection.getContentLengthLong();
 
-        File dir = new File(getContext().getCacheDir(), "updates");
-        if (!dir.exists() && !dir.mkdirs()) {
-          throw new Exception("Unable to create update cache directory");
-        }
-
-        File apkFile = new File(dir, fileName.endsWith(".apk") ? fileName : fileName + ".apk");
-        try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(apkFile)) {
+        File partialFile = new File(dir, apkFile.getName() + ".part");
+        try (InputStream input = connection.getInputStream(); FileOutputStream output = new FileOutputStream(partialFile, false)) {
             byte[] buffer = new byte[8192];
             int read;
             long downloadedBytes = 0;
@@ -76,10 +85,51 @@ public class NativeUpdaterPlugin extends Plugin {
             connection.disconnect();
         }
 
+        if (apkFile.exists() && !apkFile.delete()) {
+            throw new Exception("Unable to replace old cached APK");
+        }
+        if (!partialFile.renameTo(apkFile)) {
+            throw new Exception("Unable to save downloaded APK");
+        }
+        writeCacheMeta(metaFile, urlText, apkFile.length());
+
         if (totalBytes > 0) {
             notifyDownloadProgress(totalBytes, totalBytes);
         }
         return apkFile;
+    }
+
+    private boolean isCachedApkReady(File apkFile, File metaFile, String urlText) {
+        if (!apkFile.exists() || apkFile.length() <= 0 || !metaFile.exists()) {
+            return false;
+        }
+        try {
+            String meta = readTextFile(metaFile);
+            return meta.contains("url=" + urlText + "\n") && meta.contains("size=" + apkFile.length() + "\n");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private void writeCacheMeta(File metaFile, String urlText, long size) {
+        try {
+            String meta = "url=" + urlText + "\nsize=" + size + "\n";
+            try (FileOutputStream output = new FileOutputStream(metaFile, false)) {
+                output.write(meta.getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String readTextFile(File file) throws Exception {
+        try (InputStream input = new java.io.FileInputStream(file); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
+        }
     }
 
     private void notifyDownloadProgress(long downloadedBytes, long totalBytes) {

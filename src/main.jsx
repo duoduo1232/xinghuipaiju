@@ -3890,14 +3890,14 @@ function StartScreen({ playerName, stats, settings, onSettingsChange, onNameChan
     setUpdateState((current) => ({
       ...current,
       status: 'downloading',
-      message: '正在应用内下载 APK，下载完成后会打开安装界面。',
+      message: '正在准备 APK。若安装包已下载完整，将直接打开安装界面。',
     }));
     setUpdateProgress(0);
 
     try {
       await NativeUpdater.downloadAndInstall({
         url,
-        fileName: updateState.result?.apkName || `xinghui-${updateState.result?.tag || APP_VERSION}.apk`,
+        fileName: `xinghui-${updateState.result?.tag || APP_VERSION}-${updateState.result?.apkName || 'app-debug.apk'}`,
       });
       setUpdateProgress(100);
       setUpdateState((current) => ({
