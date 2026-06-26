@@ -971,7 +971,10 @@ button:not(:disabled) {
 .mini-stat.pollution { color: #7d53c8; }
 
 .four-seat-portrait {
+  align-self: stretch;
   min-height: 78px;
+  max-height: 150px;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 2px solid rgba(98, 122, 155, 0.28);
   border-radius: 12px;
@@ -4590,6 +4593,7 @@ button:not(:disabled) {
 
   .four-seat {
     grid-template-columns: minmax(66px, 0.44fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 3px;
     padding: 4px;
     border-radius: 12px;
@@ -4614,6 +4618,9 @@ button:not(:disabled) {
 
   .four-seat-portrait {
     min-height: 0;
+    height: clamp(52px, 18vh, 88px);
+    max-height: 88px;
+    aspect-ratio: 16 / 9;
   }
 
   .default-avatar {

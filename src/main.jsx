@@ -551,7 +551,7 @@ async function resolveMusicSource(input, signal) {
 
 function getSeatLabels(mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat = 'p1') {
   const name = localName?.trim() || DEFAULT_PLAYER_NAME;
-  if (mode === 'pve') return { p1: name, p2: 'Bot' };
+  if (mode === 'pve') return { p1: name, p2: 'donk' };
   if (mode === 'p2p' || mode === 'lan' || mode === 'relay') {
     return {
       p1: localSeat === 'p1' ? name : DEFAULT_PLAYER_NAME,
@@ -561,9 +561,9 @@ function getSeatLabels(mode = 'pve', localName = DEFAULT_PLAYER_NAME, localSeat 
   if (mode === 'ffa4' || mode === 'team4') {
     return {
       p1: name,
-      p2: 'Bot',
-      p3: mode === 'team4' ? 'AI 队友' : 'Bot',
-      p4: 'Bot',
+      p2: 'donk',
+      p3: 'niko',
+      p4: 'ZywOo',
     };
   }
   return { p1: name, p2: '对手' };
@@ -905,11 +905,21 @@ function getKillTargets(game, playerId) {
   });
 }
 
+function isTargetedDamageSkill(card) {
+  return ['killTarget', 'damageEnemy', 'trueBodyStrike'].includes(card.effect);
+}
+
+function getTargetedSkillDamage(card) {
+  if (card.effect === 'killTarget') return 40;
+  if (card.effect === 'trueBodyStrike') return 40;
+  return card.value ?? 0;
+}
+
 function getAiCardPlan(game, playerId, card) {
   const before = evaluateAiState(game, playerId);
   const contextBonus = scoreAiCard(game, playerId, card) * 0.08;
 
-  if (card.effect === 'killTarget') {
+  if (isTargetedDamageSkill(card)) {
     return getKillTargets(game, playerId)
       .map((target) => {
         const nextGame = playTargetedKill(game, playerId, card, target);
@@ -980,7 +990,7 @@ function getAiCardPlans(game, playerId, card) {
   const before = evaluateAiState(game, playerId);
   const contextBonus = scoreAiCard(game, playerId, card) * 0.08;
 
-  if (card.effect === 'killTarget') {
+  if (isTargetedDamageSkill(card)) {
     return getKillTargets(game, playerId)
       .map((target) => {
         const nextGame = playTargetedKill(game, playerId, card, target);
@@ -1048,7 +1058,7 @@ function getAiBestPlan(game, playerId) {
 }
 
 function chooseKillTarget(game, playerId) {
-  const killCard = game.players[playerId].hand.find((card) => card.effect === 'killTarget');
+  const killCard = game.players[playerId].hand.find((card) => isTargetedDamageSkill(card));
   if (killCard) {
     const plan = getAiCardPlans(game, playerId, killCard).sort((a, b) => b.score - a.score)[0];
     if (plan?.target) return plan.target;
@@ -2598,8 +2608,12 @@ function playTargetedKill(game, playerId, card, target) {
   player.discard.push(used);
   triggerMetalCabinetIfAttack(enemy, used, pollutionLogs);
 
+  const damage = getTargetedSkillDamage(used);
+  const damageKind = used.effect === 'trueBodyStrike' ? 'true' : 'physical';
+
   if (target.type === 'body') {
-    const dealt = applyBodyDamage(enemy, 40, 'physical');
+    const dealt = applyBodyDamage(enemy, damage, damageKind);
+    if (used.effect === 'trueBodyStrike') pollutionLogs.push(...applyBodySpiritDamage(enemy, 40));
     applyRewindIfDefeated(players, pollutionLogs);
     return { ...game, players, log: [...pollutionLogs, `${player.label}使用《${used.name}》，对${enemy.label}本体造成${dealt}点物伤。`, ...game.log] };
   }
@@ -2609,7 +2623,7 @@ function playTargetedKill(game, playerId, card, target) {
 
   const targetCard = enemy.characters[targetIndex];
   const deathLogs = [];
-  const { damage: dealt, shieldNote } = applyCharacterDamage(players, enemyId, targetCard, 40, 'physical');
+  const { damage: dealt, shieldNote } = applyCharacterDamage(players, enemyId, targetCard, damage, damageKind);
   if (shieldNote) deathLogs.push(shieldNote);
   cleanupDefeatedCharacters(players, enemyId, deathLogs);
   applyRewindIfDefeated(players, deathLogs);
@@ -2755,7 +2769,7 @@ function App() {
       const nextGame = structuredClone(current);
       const seat = isRelayNetworkMode(mode) ? localSeat : 'p1';
       nextGame.players[seat].label = cleaned;
-      if (mode === 'pve') nextGame.players.p2.label = 'Bot';
+      if (mode === 'pve') nextGame.players.p2.label = 'donk';
       sendNetName(seat, cleaned);
       return nextGame;
     });
@@ -3294,8 +3308,12 @@ function App() {
   }, [selectedHandCardId, visiblePlayer.hand, canPlay, victor, game, selectedPlayer]);
 
   function advance() {
-    if (!canUsePhaseButton) return;
     if (targetRequest) return;
+    if (isAiTurn) {
+      updateGame((current) => runAiStep(current, currentPlayer, { allowCycle: false }).game, { sync: false });
+      return;
+    }
+    if (!canUsePhaseButton) return;
     if (canAction && actionActor) {
       setTargetRequest({ type: 'action', actor: actionActor, playerId: selectedPlayer });
       return;
@@ -3335,7 +3353,7 @@ function App() {
       updateGame((current) => playCard(current, selectedPlayer, card));
       return;
     }
-    if (card.effect === 'killTarget') {
+    if (isTargetedDamageSkill(card)) {
       setTargetRequest({ type: 'kill', card, playerId: selectedPlayer });
       return;
     }
@@ -4886,6 +4904,9 @@ function TargetPicker({ card, enemy, enemies, actor, onCancel, onSelect }) {
   const effectText = targetEffectSummary(card, actor);
   const actorPhysicalDamage = actor ? (actor.actionDamage ?? actor.actionBodyDamage ?? actor.actionCharacterDamage ?? actor.atk ?? 0) : 0;
   const pureSpiritAction = Boolean(actor?.actionSpiritDamage && actorPhysicalDamage <= 0 && !actor.actionEffect);
+  const cardDamage = card ? getTargetedSkillDamage(card) : 0;
+  const canTargetBody = Boolean(cardDamage > 0 || actorPhysicalDamage > 0 || pureSpiritAction || actor?.actionEffect === 'itAction');
+  const canTargetCharacters = Boolean(cardDamage > 0 || actorPhysicalDamage > 0 || pureSpiritAction || actor?.actionSpiritDamage || actor?.actionEffect === 'itAction');
   return (
     <div className="detail-overlay" onClick={onCancel}>
       <article className="target-dialog" onClick={(event) => event.stopPropagation()}>
@@ -4924,11 +4945,13 @@ function TargetPicker({ card, enemy, enemies, actor, onCancel, onSelect }) {
                   <span>-{actor.actionSpiritDamage} 精神力</span>
                 </button>
               ) : null}
-              <button className="target-option body-target" onClick={() => onSelect(pureSpiritAction ? { type: 'spiritEnemy', enemyId: enemyItem.id } : { type: 'body', enemyId: enemyItem.id })}>
-                <strong>{enemyItem.label} 本体</strong>
-                <span>生命 {enemyItem.hp}</span>
-              </button>
-              {enemyItem.characters.map((character) => (
+              {canTargetBody ? (
+                <button className="target-option body-target" onClick={() => onSelect(pureSpiritAction ? { type: 'spiritEnemy', enemyId: enemyItem.id } : { type: 'body', enemyId: enemyItem.id })}>
+                  <strong>{enemyItem.label} 本体</strong>
+                  <span>生命 {enemyItem.hp}</span>
+                </button>
+              ) : null}
+              {canTargetCharacters ? enemyItem.characters.map((character) => (
                 <React.Fragment key={character.instanceId}>
                   <button
                     className="target-option"
@@ -4949,10 +4972,10 @@ function TargetPicker({ card, enemy, enemies, actor, onCancel, onSelect }) {
                     </button>
                   ) : null}
                 </React.Fragment>
-              ))}
+              )) : null}
             </React.Fragment>
           ))}
-          {enemyList.every((enemyItem) => enemyItem.characters.length === 0) && (
+          {canTargetCharacters && enemyList.every((enemyItem) => enemyItem.characters.length === 0) && (
             <div className="target-empty">敌方没有明置角色</div>
           )}
         </div>
