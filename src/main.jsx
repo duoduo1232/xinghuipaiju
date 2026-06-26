@@ -1538,8 +1538,7 @@ function runSmallPhaseEndHiddenTriggers(players) {
     [...owner.hidden].forEach((card) => {
       if (card.id === 'hidden_first_aid' && owner.hp < 20) {
         healPlayer(owner, 25);
-        discardHiddenCard(owner, card);
-        logs.push(`${owner.label}的暗置《${card.name}》触发，本体+25血，技能牌消耗。`);
+        logs.push(`${owner.label}的暗置《${card.name}》触发，本体+25血。`);
       }
       if (card.id === 'hidden_purifier' && owner.pollution >= 40) {
         logs.push(...applyPollutionChange(owner, -5));

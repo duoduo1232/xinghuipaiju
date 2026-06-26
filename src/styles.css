@@ -1793,6 +1793,19 @@ button:not(:disabled) {
   cursor: not-allowed;
 }
 
+.hand-card-wrap .card-mini::after {
+  content: "";
+  position: absolute;
+  inset: 8% 7% 7%;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(18, 12, 10, 0.28), transparent 24%, transparent 66%, rgba(18, 12, 10, 0.42)),
+    linear-gradient(90deg, rgba(255, 244, 205, 0.18), transparent 18%, transparent 82%, rgba(32, 18, 10, 0.18));
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 205, 0.18);
+}
+
 .framed-card::before {
   content: "";
   position: absolute;
@@ -1858,6 +1871,57 @@ button:not(:disabled) {
   background: #e9d7ad;
   color: transparent;
   font-size: 0;
+}
+
+.hand-card-wrap .frame-art {
+  left: 8%;
+  right: 8%;
+  top: 18%;
+  bottom: 8%;
+  height: auto;
+  z-index: 1;
+  border-radius: 7px;
+  background: #d9c99f;
+}
+
+.hand-card-wrap .frame-art img {
+  object-fit: cover;
+  object-position: center;
+}
+
+.hand-card-wrap .frame-cost,
+.hand-card-wrap .frame-value,
+.hand-card-wrap .frame-name,
+.hand-card-wrap .frame-gear {
+  z-index: 4;
+}
+
+.hand-card-wrap .frame-name {
+  left: 18%;
+  right: 18%;
+  top: 8%;
+  padding: 1px 4px 2px;
+  color: #231508;
+  border-radius: 999px;
+  background: rgba(246, 228, 178, 0.78);
+  text-shadow: 0 1px 0 rgba(255, 250, 226, 0.7);
+}
+
+.hand-card-wrap .frame-value {
+  color: #f9e7ad;
+  text-shadow: 0 1px 0 rgba(24, 12, 6, 0.85);
+}
+
+.hand-card-wrap .frame-gear {
+  top: auto;
+  right: 11%;
+  bottom: 14%;
+}
+
+.hand-card-wrap .frame-text,
+.hand-card-wrap .frame-type,
+.hand-card-wrap .frame-stats {
+  display: none;
 }
 
 .frame-art img,
@@ -2819,9 +2883,9 @@ button:not(:disabled) {
 
 .detail-dialog {
   display: grid;
-  grid-template-columns: minmax(220px, 330px) minmax(260px, 1fr);
-  gap: 24px;
-  padding: 28px;
+  grid-template-columns: minmax(300px, 420px) minmax(300px, 1fr);
+  gap: 30px;
+  padding: 30px;
   align-items: center;
   min-height: 0;
 }
@@ -2837,7 +2901,7 @@ button:not(:disabled) {
 }
 
 .card-preview {
-  width: min(320px, 34vw);
+  width: clamp(300px, 42vw, 430px);
   height: auto;
   aspect-ratio: 136 / 181;
   place-self: center;
@@ -3106,7 +3170,7 @@ button:not(:disabled) {
   }
 
   .card-preview {
-    width: min(300px, 72vw);
+    width: min(380px, 82vw);
     height: auto;
     margin: 0;
     transform: none;
@@ -3249,7 +3313,7 @@ button:not(:disabled) {
   }
 
   .card-preview {
-    width: min(260px, 78vw);
+    width: min(340px, 86vw);
     height: auto;
     margin: 0;
     transform: none;
@@ -3257,6 +3321,37 @@ button:not(:disabled) {
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
+  .phase-banner {
+    align-items: start;
+    z-index: 7;
+    padding-top: 34px;
+  }
+
+  .phase-banner span {
+    min-width: 190px;
+    min-height: 28px;
+    padding: 3px 26px;
+    border-width: 2px;
+    opacity: 0.82;
+    font-size: 14px;
+    filter: drop-shadow(0 3px 6px rgba(88, 119, 160, 0.12));
+  }
+
+  .phase-banner span::before,
+  .phase-banner span::after {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+  }
+
+  .phase-banner span::before {
+    left: calc(50% - 108px);
+  }
+
+  .phase-banner span::after {
+    right: calc(50% - 108px);
+  }
+
   .game-table {
     width: min(100vw, 100%);
     height: min(100vh, 100%);
@@ -4480,13 +4575,13 @@ button:not(:disabled) {
 /* 手机横屏专用：4 人模式紧凑布局，避免座位挤成一团 + 垂直溢出 */
 @media (orientation: landscape) and (max-height: 520px) {
   .battlefield-four {
-    grid-template-columns: minmax(0, 1fr) 78px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
-      "left top right"
-      "left center self";
-    gap: 4px;
-    padding: 3px 4px;
+      "left right"
+      "top self";
+    gap: 6px;
+    padding: 4px 6px;
     height: 100%;
     min-height: 0;
     max-height: 100%;
@@ -4494,7 +4589,7 @@ button:not(:disabled) {
   }
 
   .four-seat {
-    grid-template-columns: minmax(0, 0.62fr) minmax(0, 1fr);
+    grid-template-columns: minmax(66px, 0.44fr) minmax(0, 1fr);
     gap: 3px;
     padding: 4px;
     border-radius: 12px;
@@ -4558,21 +4653,31 @@ button:not(:disabled) {
 
   /* seat-top 在窄中列里只显示精简信息，不再被压成乱条 */
   .seat-top {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-    padding: 3px;
+    grid-template-columns: minmax(66px, 0.44fr) minmax(0, 1fr);
+    gap: 3px;
+    padding: 4px;
   }
 
   .seat-top .four-seat-portrait {
-    display: none;
+    display: block;
   }
 
   .seat-top .four-seat-cards {
-    display: none;
+    display: grid;
   }
 
   .center-panel-four {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    z-index: 8;
+    width: 94px;
+    transform: translate(-50%, -50%);
     gap: 3px;
+    padding: 6px;
+    background: rgba(255, 250, 242, 0.86);
+    border-radius: 16px;
+    box-shadow: 0 6px 18px rgba(70, 57, 37, 0.18), inset 0 0 0 2px rgba(255, 255, 255, 0.38);
   }
 
   .center-panel-four .phase-chip {
